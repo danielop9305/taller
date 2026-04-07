@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Inventario - {{ categoria }}</h2>
+<form method="GET" action="/inventario">
+    <button type="submit">Volver</button>
+</form>
+
+{% if not session.get("admin_autorizado") %}
+<form method="POST" action="/validar_admin">
+    <input type="hidden" name="categoria" value="{{ categoria }}">
+    <label>Contraseña admin:</label>
+    <input type="password" name="admin_pass" required>
+    <button type="submit">Ingresar</button>
+</form>
+{% else %}
+<form method="POST" action="/cerrar_admin">
+    <button type="submit">Cerrar sesión</button>
+</form>
+{% endif %}
+
+<table border="1" cellspacing="0" cellpadding="5">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Nombre</th>
+            <th>Cantidad</th>
+            <th>Precio Unitario</th>
+            {% if session.get("admin_autorizado") %}
+            <th>Acciones</th>
+            {% endif %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for p in piezas %}
+            {% set ratio = p.cantidad / p.stock_maximo if p.stock_maximo > 0 else 0 %}
+            {% if p.cantidad <= 3 or ratio <= 0.33 %}
+                {% set color = 'red' %}
+            {% elif ratio <= 0.66 %}
+                {% set color = 'orange' %}
+            {% else %}
+                {% set color = 'green' %}
+            {% endif %}
+        <tr>
+            <td>{{ p.id }}</td>
+            <td style="color: {{ color }}; font-weight: bold;">
+                {% if session.get("admin_autorizado") %}
+                    <form method="POST" action="/editar_inventario/{{ p.id }}" style="display:inline;">
+                        <input type="text" name="nombre" value="{{ p.nombre }}" required>
+                        <input type="number" name="precio" step="0.01" value="{{ p.precio_unitario }}" required>
+                        <button type="submit">Guardar</button>
+                    </form>
+                {% else %}
+                    {{ p.nombre }}
+                {% endif %}
+
+                <!-- Compatibilidades -->
+                <div style="margin-top:5px;">
+                    {% for comp in p.compatibilidades %}
+                        <span style="background-color:#e0e0e0; padding:3px 6px; margin:2px; border-radius:5px; display:inline-block;">
+                            {{ comp.moto_modelo }}
+                            {% if session.get("admin_autorizado") %}
+                                <form method="POST" action="/eliminar_compatibilidad/{{ comp.id }}" style="display:inline;">
+                                    <button type="submit" style="background:none; border:none; color:red; font-weight:bold;">x</button>
+                                </form>
+                            {% endif %}
+                        </span>
+                    {% endfor %}
+                </div>
+
+                {% if session.get("admin_autorizado") %}
+                <form method="POST" action="/agregar_compatibilidad/{{ p.id }}" style="margin-top:5px;">
+                    <input type="text" name="moto_modelo" placeholder="Modelo moto" required>
+                    <button type="submit">Añadir</button>
+                </form>
+                {% endif %}
+            </td>
+            <td>{{ p.cantidad }}</td>
+            <td>${{ "%.2f"|format(p.precio_unitario) }}</td>
+            {% if session.get("admin_autorizado") %}
+            <td>
+                <!-- Reabastecer -->
+                <form method="POST" action="/restock/{{ p.id }}" style="display:inline;">
+                    <input type="number" name="cantidad" min="1" placeholder="Cantidad">
+                    <button type="submit">Reabastecer</button>
+                </form>
+
+                <!-- Eliminar -->
+                <form method="POST" action="/eliminar_inventario/{{ p.id }}" style="display:inline;">
+                    <button type="submit">Eliminar</button>
+                </form>
+            </td>
+            {% endif %}
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

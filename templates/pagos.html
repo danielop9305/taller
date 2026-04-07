@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Registro de Pagos</h2>
+<ul>
+    {% for p in lista %}
+        <li>{{ p.fecha }} - {{ p.tipo }} - ${{ p.monto }}</li>
+    {% endfor %}
+</ul>
+<h3>Registrar nuevo pago</h3>
+<form method="POST" action="{{ url_for('registrar_pago') }}">
+    Tipo: 
+    <select name="tipo">
+        <option value="efectivo">Efectivo</option>
+        <option value="transferencia">Transferencia</option>
+    </select><br>
+    Monto: <input type="number" step="0.01" name="monto"><br>
+    Fecha: <input type="text" name="fecha"><br>
+    <input type="submit" value="Registrar">
+</form>
+{% endblock %}
+ 

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Taller Moto Pingüino</title>
+</head>
+<body>
+    <h1>Taller Moto Pingüino</h1>
+    <nav>
+        <a href="{{ url_for('servicios') }}">Servicios</a> |
+        <a href="{{ url_for('inventario') }}">Inventario</a> |
+        <a href="{{ url_for('clientes') }}">Clientes</a> |
+        <a href="{{ url_for('ventas') }}">Ventas</a> |
+        <a href="{{ url_for('carrito') }}">Carrito</a>
+    </nav>
+    <hr>
+    {% block content %}{% endblock %}
+</body>
+</html>

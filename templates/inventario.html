@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Inventario</h2>
+
+<div>
+    {% for cat, estado in categorias %}
+        <form method="GET" action="/inventario/{{ cat }}">
+            <button type="submit" style="color: {{ estado }}; font-weight: bold;">
+                {{ cat }}
+            </button>
+        </form>
+    {% endfor %}
+</div>
+
+<h3>Agregar nuevo producto</h3>
+<form method="POST" action="/agregar_pieza">
+    <label>Categoría:</label>
+    <input type="text" name="categoria" required>
+
+    <label>Nombre:</label>
+    <input type="text" name="nombre" required>
+
+    <label>Cantidad:</label>
+    <input type="number" name="cantidad" min="0" required>
+
+    <label>Precio Unitario:</label>
+    <input type="number" name="precio" step="0.01" min="0.01" required>
+
+    <button type="submit">Agregar</button>
+</form>
+{% endblock %}
+

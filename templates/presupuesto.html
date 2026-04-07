@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block content %}
+    <h2>Presupuesto para {{ moto.modelo }}</h2>
+
+    <!-- Formulario para agregar producto -->
+    <form method="POST" action="/agregar_presupuesto/{{ moto.id }}">
+        <label>Producto:</label>
+        <input type="text" id="producto" name="producto" required autocomplete="off">
+        <div id="sugerencias" style="border:1px solid #ccc; display:none; position:absolute; background:#fff;"></div>
+
+        <label>Cantidad:</label>
+        <input type="number" name="cantidad" min="1" required>
+
+        <label>Precio unitario:</label>
+        <input type="number" id="precio_unitario" name="precio_unitario" step="0.01" required>
+
+        <button type="submit">Agregar al carrito</button>
+    </form>
+
+    <!-- Tabla dinámica de presupuesto -->
+    <table border="1" cellspacing="0" cellpadding="5">
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                <th>Total</th>
+                <th>Acción</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in moto.presupuestos %}
+            <tr>
+                <td>{{ p.producto }}</td>
+                <td>{{ p.cantidad }}</td>
+                <td>${{ "%.2f"|format(p.total) }}</td>
+                <td>
+                    <form method="POST" action="/eliminar_presupuesto/{{ p.id }}">
+                        <button type="submit" onclick="confirmarAccion('/eliminar_presupuesto/{{ p.id }}')">Eliminar</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Total -->
+    <p><strong>Total:</strong> ${{ "%.2f"|format(total) }}</p>
+
+
+    <!-- Botón Atrás -->
+    <a href="/motos/{{ moto.cliente_id }}">Atrás</a>
+
+    <!-- Modal de confirmación -->
+    <div id="modalConfirmacion" style="display:none; position:fixed; top:30%; left:40%; background:#fff; border:1px solid #000; padding:20px;">
+        <p>¿Confirmar la acción?</p>
+        <button id="btnAceptar">Aceptar</button>
+        <button id="btnCancelar">Cancelar</button>
+    </div>
+
+    <script>
+        let accionPendiente = null;
+
+        function confirmarAccion(url) {
+            accionPendiente = url;
+            document.getElementById("modalConfirmacion").style.display = "block";
+        }
+
+        document.getElementById("btnAceptar").onclick = function() {
+            if (accionPendiente) {
+                const form = document.createElement("form");
+                form.method = "POST";
+                form.action = accionPendiente;
+                document.body.appendChild(form);
+                form.submit();
+            }
+        };
+
+        document.getElementById("btnCancelar").onclick = function() {
+            document.getElementById("modalConfirmacion").style.display = "none";
+            accionPendiente = null;
+        };
+
+        // Autocomplete de productos
+        const inputProducto = document.getElementById("producto");
+        const sugerenciasDiv = document.getElementById("sugerencias");
+        const precioInput = document.getElementById("precio_unitario");
+
+        inputProducto.addEventListener("input", function() {
+            const q = this.value;
+            if (q.length < 2) {
+                sugerenciasDiv.style.display = "none";
+                return;
+            }
+            fetch(`/buscar_producto?q=${q}`)
+                .then(res => res.json())
+                .then(data => {
+                    sugerenciasDiv.innerHTML = "";
+                    if (data.length > 0) {
+                        data.forEach(item => {
+                            const div = document.createElement("div");
+                            div.textContent = item.nombre + " - $" + item.precio;
+                            div.style.cursor = "pointer";
+
+                            // Colores según stock
+                            if (item.stock !== null) {
+                                if (item.stock > 10) div.style.background = "#c8e6c9"; // verde
+                                else if (item.stock > 0) div.style.background = "#fff9c4"; // amarillo
+                                else div.style.background = "#ffcdd2"; // rojo
+                            }
+
+                            div.onclick = function() {
+                                inputProducto.value = item.nombre;
+                                precioInput.value = item.precio;
+                                if (item.stock === 0) {
+                                    alert("Producto sin stock, no se puede seleccionar");
+                                    inputProducto.value = "";
+                                    precioInput.value = "";
+                                } else {
+                                    precioInput.setAttribute("readonly", true);
+                                }
+                                sugerenciasDiv.style.display = "none";
+                            };
+                            sugerenciasDiv.appendChild(div);
+                        });
+                        sugerenciasDiv.style.display = "block";
+                    } else {
+                        sugerenciasDiv.style.display = "none";
+                        precioInput.removeAttribute("readonly");
+                    }
+                });
+        });
+    </script>
+{% endblock %}

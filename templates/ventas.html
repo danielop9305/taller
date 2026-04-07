@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+    <h2>Ventas</h2>
+
+    <table border="1" cellspacing="0" cellpadding="5">
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Descripción</th>
+                <th>Tipo</th>
+                <th>Cantidad</th>
+                <th>Importe</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for v in lista %}
+            <tr>
+                <td>{{ v.fecha.strftime("%Y-%m-%d") }}</td>
+                <td>{{ v.descripcion }}</td>
+                <td>{{ v.tipo }}</td>
+                <td>{{ v.cantidad_vendida }}</td>
+                <td>${{ "%.2f"|format(v.monto) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <p>Total Refacciones: ${{ "%.2f"|format(total_refacciones) }}</p>
+    <p>Total Mano de Obra: ${{ "%.2f"|format(total_mano_obra) }}</p>
+    <p>Total General: ${{ "%.2f"|format(total_general) }}</p>
+
+    <form method="POST" action="/cerrar_caja">
+        <label>Contraseña:</label>
+        <input type="password" name="admin_pass">
+        <button type="submit">Cerrar Caja</button>
+    </form>
+{% endblock %}

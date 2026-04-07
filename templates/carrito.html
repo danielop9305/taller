@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block content %}
+    <h2>Registrar nueva venta</h2>
+    <form method="POST" action="/agregar_carrito">
+        <label>Producto:</label>
+        <input type="text" id="producto" name="producto" autocomplete="off">
+        <div id="coincidencias"></div>
+
+        <label>Cantidad:</label>
+        <input type="number" name="cantidad" min="1" required>
+
+        <button type="submit">Agregar al carrito</button>
+    </form>
+
+    <h3>Carrito actual</h3>
+    {% if carrito %}
+    <table border="1" cellspacing="0" cellpadding="5">
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                <th>Precio Unitario</th>
+                <th>Total</th>
+                <th>Acción</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in carrito %}
+            <tr>
+                <td>{{ item["nombre"] }}</td>
+                <td>{{ item["cantidad"] }}</td>
+                <td>${{ "%.2f"|format(item["precio_unitario"]) }}</td>
+                <td>${{ "%.2f"|format(item["total"]) }}</td>
+                <td>
+                    <form method="POST" action="/eliminar_del_carrito/{{ item['id'] }}">
+                        <button type="submit">Eliminar</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <p>Total Carrito: ${{ "%.2f"|format(total_carrito) }}</p>
+
+    <form method="POST" action="/confirmar_venta">
+        <label>Recibido:</label>
+        <input type="number" name="recibido" step="0.01" required>
+        <button type="submit">Confirmar venta</button>
+    </form>
+
+    <form method="POST" action="/cancelar_carrito">
+        <button type="submit">Cancelar carrito</button>
+    </form>
+    {% else %}
+    <p>El carrito está vacío.</p>
+    {% endif %}
+
+    <script>
+    document.getElementById("producto").addEventListener("input", function() {
+        const query = this.value;
+        if (query.length === 0) {
+            document.getElementById("coincidencias").innerHTML = "";
+            return;
+        }
+
+        fetch(`/sugerir_producto?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                let html = "<ul>";
+                data.forEach(item => {
+                    let color = item.estado;
+                    let leyenda = item.leyenda ? " - " + item.leyenda : "";
+                    let disabled = item.seleccionable ? "" : "style='pointer-events:none;opacity:0.5;'";
+
+                    html += `<li ${disabled} style="color:${color};font-weight:bold;" 
+                                onclick="seleccionarProducto('${item.nombre}', ${item.id})">
+                                ${item.categoria} - ${item.nombre}${leyenda}
+                             </li>`;
+                });
+                html += "</ul>";
+                document.getElementById("coincidencias").innerHTML = html;
+            });
+    });
+
+    function seleccionarProducto(nombre, id) {
+        document.getElementById("producto").value = nombre;
+        document.getElementById("coincidencias").innerHTML = "";
+        let hidden = document.getElementById("producto_id");
+        if (!hidden) {
+            hidden = document.createElement("input");
+            hidden.type = "hidden";
+            hidden.id = "producto_id";
+            hidden.name = "producto_id";
+            document.forms[0].appendChild(hidden);
+        }
+        hidden.value = id;
+    }
+    </script>
+{% endblock %}

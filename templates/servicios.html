@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+    <h2>Servicios</h2>
+
+    {% for tipo, lista in servicios_por_tipo.items() %}
+        <button type="button" onclick="toggle('{{ tipo }}')">{{ tipo }}</button>
+        <div id="{{ tipo }}" style="display:none; margin-left:20px;">
+            <form method="POST" action="/agregar_servicios_carrito">
+                <table border="1" cellspacing="0" cellpadding="5">
+                    <thead>
+                        <tr>
+                            <th>Seleccionar</th>
+                            <th>Nombre</th>
+                            <th>Importe</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in lista %}
+                        <tr>
+                            <td><input type="checkbox" name="servicios_seleccionados" value="{{ s.id }}"></td>
+                            <td>{{ s.nombre }}</td>
+                            <td>${{ "%.2f"|format(s.importe) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <button type="submit">Agregar al carrito</button>
+            </form>
+        </div>
+    {% endfor %}
+
+    <h3>Agregar nuevo servicio</h3>
+    <form method="POST" action="/agregar_servicio">
+        <label>Tipo:</label>
+        <input type="text" name="tipo">
+        <label>Nombre:</label>
+        <input type="text" name="nombre">
+        <label>Importe:</label>
+        <input type="number" name="importe" step="0.01">
+        <button type="submit">Agregar</button>
+    </form>
+
+    <script>
+        function toggle(id) {
+            const div = document.getElementById(id);
+            div.style.display = div.style.display === "none" ? "block" : "none";
+        }
+    </script>
+{% endblock %}
+
