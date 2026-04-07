@@ -7,7 +7,7 @@ from models import db, Inventario, Compatibilidad, Venta, Cliente, Servicio, Pag
 def init_app(app):
     @app.route("/")
     def home():
-        return render_template("base.html")
+        return render_template("home.html")
     
     @app.route("/reset_sesion")
     def reset_sesion():
