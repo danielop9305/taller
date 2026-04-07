@@ -65,6 +65,9 @@ app.secret_key = "clave_secreta_segura"
 db.init_app(app)        # aquí se vincula la instancia al app
 migrate = Migrate(app, db)
 
+with app.app_context():
+    db.create_all()
+
 routes.init_app(app)
 
 if __name__ == "__main__":
