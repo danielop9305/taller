@@ -1,0 +1,14 @@
+# Entorno virtual
+venv/
+__pycache__/
+
+# Archivos de compilación
+build/
+dist/
+*.spec
+
+# Bases de datos locales
+*.db
+
+# Archivos temporales
+*.log
