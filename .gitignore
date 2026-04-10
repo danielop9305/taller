@@ -12,3 +12,12 @@ dist/
 
 # Archivos temporales
 *.log
+
+# Ignorar base de datos local
+instance/taller.db
+*.db
+
+# Ignorar compilaciones
+build/
+dist/
+*.spec

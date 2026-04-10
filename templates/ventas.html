@@ -1,5 +1,14 @@
 {% extends "base.html" %}
 {% block content %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="flashes">
+          {% for category, message in messages %}
+            <li class="{{ category }}">{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
     <h2>Ventas</h2>
 
     <table border="1" cellspacing="0" cellpadding="5">
@@ -26,8 +35,9 @@
     </table>
 
     <p>Total Refacciones: ${{ "%.2f"|format(total_refacciones) }}</p>
-    <p>Total Mano de Obra: ${{ "%.2f"|format(total_mano_obra) }}</p>
+    <p>Total Mano de Obra: ${{ "%.2f"|format(total_servicios) }}</p>
     <p>Total General: ${{ "%.2f"|format(total_general) }}</p>
+     <p>Nómina: ${{ "%.2f"|format(nomina) }}</p>
 
     <form method="POST" action="/cerrar_caja">
         <label>Contraseña:</label>

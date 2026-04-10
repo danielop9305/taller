@@ -1,5 +1,14 @@
 {% extends "base.html" %}
 {% block content %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="flashes">
+          {% for category, message in messages %}
+            <li class="{{ category }}">{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
     <h2>Registrar nueva venta</h2>
     <form method="POST" action="/agregar_carrito">
         <label>Producto:</label>
@@ -44,7 +53,8 @@
 
     <form method="POST" action="/confirmar_venta">
         <label>Recibido:</label>
-        <input type="number" name="recibido" step="0.01" required>
+        <input type="number" id="recibido" name="recibido" step="0.01" required>
+        <p id="cambio"></p>
         <button type="submit">Confirmar venta</button>
     </form>
 
@@ -95,5 +105,15 @@
         }
         hidden.value = id;
     }
+
+    // cálculo dinámico de cambio
+    const recibidoInput = document.getElementById("recibido");
+    const cambioLabel = document.getElementById("cambio");
+    recibidoInput.addEventListener("input", function() {
+        const recibido = parseFloat(this.value) || 0;
+        const total = {{ "%.2f"|format(total_carrito) }};
+        const cambio = recibido - total;
+        cambioLabel.textContent = "Cambio: $" + cambio.toFixed(2);
+    });
     </script>
 {% endblock %}

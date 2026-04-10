@@ -16,6 +16,13 @@ class Cliente(db.Model):
     nombre = db.Column(db.String(100), nullable=False)
     celular = db.Column(db.String(20), nullable=False)
 
+    # 🔹 Nuevos campos nivel sencillo
+    anticipo = db.Column(db.Float, default=0.0)              # dinero a cuenta
+    fecha_ingreso = db.Column(db.DateTime, default=datetime.utcnow)  # fecha de ingreso
+    fecha_entrega = db.Column(db.DateTime, nullable=True)    # fecha estimada de entrega
+    descripcion_problema = db.Column(db.Text, nullable=True) # descripción detallada del problema
+    problemas_ocultos = db.Column(db.Boolean, default=False) # cláusula de problemas ocultos aceptada
+
     lista_motos = db.relationship(
         'Moto',
         backref='cliente',
@@ -39,6 +46,7 @@ class Inventario(db.Model):
     cantidad = db.Column(db.Integer, default=0)
     stock_maximo = db.Column(db.Integer, default=0)
     precio_unitario = db.Column(db.Float, nullable=False)
+    reservado = db.Column(db.Integer, default=0)
     # Relación con ventas
     ventas = db.relationship("Venta", backref="producto")
 
@@ -60,8 +68,6 @@ class Moto(db.Model):
     def total_presupuesto(self):
         return sum(p.total for p in self.presupuestos)
 
-
-
 class Pago(db.Model):
     __tablename__ = "pago"
     id = db.Column(db.Integer, primary_key=True)
@@ -73,11 +79,30 @@ class Pago(db.Model):
 class Presupuesto(db.Model):
     __tablename__ = "presupuesto"
     id = db.Column(db.Integer, primary_key=True)
-    moto_id = db.Column(db.Integer, db.ForeignKey("moto.id"), nullable=False)
     producto = db.Column(db.String(100), nullable=False)
     cantidad = db.Column(db.Integer, nullable=False)
-    total = db.Column(db.Float, nullable=False)
-    producto_id = db.Column(db.Integer, db.ForeignKey("inventario.id"), nullable=True)
+    precio_unitario = db.Column(db.Float, default=0.0)
+    total = db.Column(db.Float, default=0.0)
+    moto_id = db.Column(
+        db.Integer,
+        db.ForeignKey("moto.id", name="fk_presupuesto_moto_id"),
+        nullable=False
+    )
+
+class RefaccionCliente(db.Model):
+    __tablename__ = "refaccion_cliente"
+
+    id = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey("cliente.id", ondelete="CASCADE"), nullable=False)
+    nombre = db.Column(db.String(100), nullable=False)
+    cantidad = db.Column(db.Integer, default=1)
+    estado = db.Column(db.String(50), nullable=True)
+    firma_recepcion = db.Column(db.Boolean, default=False)
+
+    cliente = db.relationship(
+        "Cliente",
+        backref=db.backref("refacciones_cliente", lazy=True, cascade="all, delete-orphan")
+    )
 
 class Servicio(db.Model):
     __tablename__ = "servicio"
