@@ -34,6 +34,14 @@ pyinstaller --onefile ^
  app.py
 
 echo =========================================
+echo Subiendo cambios al repositorio Git...
+echo =========================================
+git add .
+set /p mensaje=Escribe el mensaje del commit: 
+git commit -m "%mensaje%"
+git push origin main
+
+echo =========================================
 echo Proceso terminado.
 echo El nuevo .exe está en la carpeta "dist".
 echo =========================================

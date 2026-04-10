@@ -5,6 +5,7 @@ import routes
 import requests
 import os
 import sys
+import webbrowser
 
 LOCAL_VERSION = "1.0.0"
 VERSION_URL = "https://raw.githubusercontent.com/danielop9305/taller/main/version.json"
@@ -64,5 +65,6 @@ routes.init_app(app)
 
 if __name__ == "__main__":
     check_for_update()
+    webbrowser.open("http://127.0.0.1:5000")
     app.run(debug=True)
 
