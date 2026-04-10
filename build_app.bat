@@ -12,6 +12,12 @@ echo =========================================
 call venv\Scripts\activate
 
 echo =========================================
+echo Instalando dependencias necesarias...
+echo =========================================
+pip install --upgrade pip
+pip install pandas openpyxl
+
+echo =========================================
 echo Aplicando migraciones pendientes...
 echo =========================================
 flask db upgrade

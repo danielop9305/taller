@@ -1,7 +1,9 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
+from flask import Blueprint, Flask, render_template, request, redirect, url_for, session, jsonify, flash
 from datetime import datetime
 from models import db, Inventario, Compatibilidad, Venta, Cliente, Servicio, Pago, Moto, Caja, Presupuesto, RefaccionCliente
-
+import pandas as pd
+from sqlalchemy import text
+import os
 
 #INICIO y HOME
 def init_app(app):
@@ -994,34 +996,59 @@ def init_app(app):
 
     @app.route("/cerrar_caja", methods=["POST"])
     def cerrar_caja():
-        """
-        Cierra la caja y reinicia las ventas.
-        - Verifica la contraseña de administrador.
-        - Si es correcta, elimina todos los registros de la tabla Venta.
-        - Confirma la operación con un mensaje flash.
-        """
         password = request.form.get("admin_pass")
         if password != "1602":
             flash("Contraseña incorrecta", "error")
             return redirect("/ventas")
 
-        # Reiniciar tabla Ventas
+        # Exportar cierre a Excel usando modelo Venta
+        ventas = Venta.query.all()
+        df_ventas = pd.DataFrame([{
+            "id": v.id,
+            "fecha": v.fecha,
+            "producto": v.descripcion,
+            "cantidad": v.cantidad_vendida,
+            "precio": v.monto,
+            "total": v.monto
+        } for v in ventas])
+        total_general = df_ventas["total"].sum()
+
+        # ⚠️ CAMBIO: ya no se consulta Nomina, solo se guarda el cálculo de nómina
+        total_servicios = db.session.query(db.func.sum(Venta.monto)).filter_by(tipo="servicio").scalar() or 0
+        nomina = total_servicios * 0.20
+        df_nomina = pd.DataFrame([{"Nomina calculada": nomina}])
+
+        os.makedirs("reportes", exist_ok=True)
+        with pd.ExcelWriter("reportes/cierre_caja.xlsx", engine="openpyxl") as writer:
+            df_ventas.to_excel(writer, sheet_name="Ventas", index=False)
+            df_nomina.to_excel(writer, sheet_name="Nomina", index=False)
+            df_totales = pd.DataFrame([{"Total Ventas": total_general}])
+            df_totales.to_excel(writer, sheet_name="Totales", index=False)
+
         Venta.query.delete()
         db.session.commit()
 
-        flash("Caja cerrada y ventas reiniciadas", "info")
+        flash("Caja cerrada, ventas reiniciadas y cierre exportado a Excel", "info")
         return redirect("/ventas")
-
 
     @app.route("/ventas")
     def ventas():
-        # Totales por tipo
         total_refacciones = db.session.query(db.func.sum(Venta.monto)).filter_by(tipo="refaccion").scalar() or 0
         total_servicios   = db.session.query(db.func.sum(Venta.monto)).filter_by(tipo="servicio").scalar() or 0
         total_general     = total_refacciones + total_servicios
 
+        # ⚠️ CAMBIO: nómina como cálculo
         nomina = total_servicios * 0.20
         lista = Venta.query.all()
+
+        df_ventas = pd.DataFrame([{
+            "id": v.id,
+            "fecha": v.fecha,
+            "producto": v.descripcion,
+            "cantidad": v.cantidad_vendida,
+            "precio": v.monto,
+            "total": v.monto
+        } for v in lista])
 
         return render_template(
             "ventas.html",
@@ -1034,14 +1061,18 @@ def init_app(app):
 
     @app.route("/ventas_resumen")
     def mostrar_ventas():
-        """
-        Muestra todas las ventas registradas con total general.
-        - Consulta todos los registros de la tabla Venta.
-        - Calcula el total de ventas sin desglose por tipo.
-        - Renderiza la plantilla ventas.html con los datos.
-        """
         ventas = Venta.query.all()
-        total = sum(v.monto for v in ventas)
+        total_refacciones = db.session.query(db.func.sum(Venta.monto)).filter_by(tipo="refaccion").scalar() or 0
+        total_servicios   = db.session.query(db.func.sum(Venta.monto)).filter_by(tipo="servicio").scalar() or 0
+        total_general     = total_refacciones + total_servicios
+
+        # ⚠️ CAMBIO: nómina como cálculo
+        nomina = total_servicios * 0.20
+
         return render_template("ventas.html",
-                           ventas=ventas,
-                           total_ventas=total)
+                               lista=ventas,
+                               total_refacciones=total_refacciones,
+                               total_servicios=total_servicios,
+                               total_general=total_general,
+                               nomina=nomina)
+

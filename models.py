@@ -50,6 +50,13 @@ class Inventario(db.Model):
     # Relación con ventas
     ventas = db.relationship("Venta", backref="producto")
 
+class Nomina(db.Model):
+    __tablename__ = "nomina"
+    id = db.Column(db.Integer, primary_key=True)
+    sueldo = db.Column(db.Float, nullable=False)
+
+
+
 class Moto(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     modelo = db.Column(db.String(100))

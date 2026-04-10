@@ -56,15 +56,12 @@ def download_update(url):
     except Exception as e:
         print(f"Error al descargar actualización: {e}")
 
-#with app.app_context():
-    # Aplica migraciones al arrancar
- #   upgrade()
-  #  db.create_all()
-
 routes.init_app(app)
 
 if __name__ == "__main__":
     check_for_update()
+    import webbrowser
     webbrowser.open("http://127.0.0.1:5000")
-    app.run(debug=True)
+    app.run(debug=False, use_reloader=False)
+
 
