@@ -1,23 +1,50 @@
-# Entorno virtual
-venv/
+# =========================================
+# Archivos de Python
+# =========================================
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
 
-# Archivos de compilación
+# =========================================
+# Entorno virtual
+# =========================================
+venv/
+env/
+
+# =========================================
+# Compilaciones y ejecutables
+# =========================================
 build/
 dist/
 *.spec
+*.exe
 
-# Bases de datos locales
-*.db
+# =========================================
+# Migraciones (solo versiones, no estructura base)
+# =========================================
+migrations/versions/*.py
 
-# Archivos temporales
+# =========================================
+# Base de datos local
+# =========================================
+*.sqlite3
+instance/*.db
+
+# =========================================
+# Archivos de usuario / reportes
+# =========================================
+reportes/*.xlsx
+reportes/*.csv
+
+# =========================================
+# Logs y temporales
+# =========================================
 *.log
+*.tmp
 
-# Ignorar base de datos local
-instance/taller.db
-*.db
-
-# Ignorar compilaciones
-build/
-dist/
-*.spec
+# =========================================
+# Archivos de sistema
+# =========================================
+.DS_Store
+Thumbs.db
