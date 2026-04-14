@@ -40,13 +40,16 @@ class Compatibilidad(db.Model):
 
 class Inventario(db.Model):
     __tablename__ = "inventario"
+
     id = db.Column(db.Integer, primary_key=True)
     categoria = db.Column(db.String(50), nullable=False)
     nombre = db.Column(db.String(100), nullable=False, unique=True)
     cantidad = db.Column(db.Integer, default=0)
     stock_maximo = db.Column(db.Integer, default=0)
     precio_unitario = db.Column(db.Float, nullable=False)
+    costo_unitario = db.Column(db.Float, nullable=True)   # ✅ Nuevo campo
     reservado = db.Column(db.Integer, default=0)
+
     # Relación con ventas
     ventas = db.relationship("Venta", backref="producto")
 

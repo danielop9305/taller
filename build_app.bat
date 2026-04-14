@@ -82,13 +82,15 @@ echo Verificando si el release ya existe...
 echo =========================================
 gh release view %version% >nul 2>&1
 IF %ERRORLEVEL% EQU 0 (
-    echo ⚠️ El release %version% ya existe. Se omitira la creacion.
+    echo ⚠️ El release %version% ya existe. Se actualizara con el nuevo ejecutable...
+    gh release upload %version% dist\app.exe --clobber
 ) ELSE (
     echo =========================================
     echo Publicando nuevo ejecutable en GitHub Releases...
     echo =========================================
     gh release create %version% dist\app.exe --title "Version %version%" --notes "Compilacion automatica del %fecha%"
 )
+
 
 echo =========================================
 echo Proceso terminado correctamente.

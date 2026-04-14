@@ -15,12 +15,12 @@
         <button type="button" onclick="toggle('{{ tipo }}')">{{ tipo }}</button>
         <div id="{{ tipo }}" style="display:none; margin-left:20px;">
             <form method="POST" action="/agregar_servicios_carrito">
-                <table border="1" cellspacing="0" cellpadding="5">
+                <table class="tabla-servicios">
                     <thead>
                         <tr>
-                            <th>Seleccionar</th>
                             <th>Nombre</th>
                             <th>Importe</th>
+                            <th>Seleccionar</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -45,7 +45,7 @@
         <label>Nombre:</label>
         <input type="text" name="nombre">
         <label>Importe:</label>
-        <input type="number" name="importe" step="0.01">
+        <input type="number" name="importe">
         <button type="submit">Agregar</button>
     </form>
 
@@ -55,5 +55,31 @@
             div.style.display = div.style.display === "none" ? "block" : "none";
         }
     </script>
-{% endblock %}
 
+    <style>
+        .tabla-servicios {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        .tabla-servicios th {
+            font-weight: bold;
+            text-transform: uppercase;
+            background-color: #d9d9d9;
+            padding: 8px;
+            text-align: center;
+        }
+        .tabla-servicios td {
+            padding: 8px;
+            text-align: left;
+        }
+        .tabla-servicios tbody tr:nth-child(odd) {
+            background-color: #ffffff;
+        }
+        .tabla-servicios tbody tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .tabla-servicios, .tabla-servicios th, .tabla-servicios td {
+            border: 1px solid #000;
+        }
+    </style>
+{% endblock %}

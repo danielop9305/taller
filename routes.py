@@ -4,6 +4,13 @@ from models import db, Inventario, Compatibilidad, Venta, Cliente, Servicio, Pag
 import pandas as pd
 from sqlalchemy import text
 import os
+from openpyxl import load_workbook
+
+# Para envío de correos
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 
 #INICIO y HOME
 def init_app(app):
@@ -314,6 +321,9 @@ def init_app(app):
 
     @app.route("/clientes")
     def clientes():
+        print("Ruta de templates usada:", app.template_folder)
+        print("Ruta absoluta de clientes.html:", os.path.join(app.template_folder, "clientes.html"))
+
         """
         Muestra la lista de clientes registrados.
         - Consulta todos los registros de la tabla Cliente.
@@ -411,17 +421,11 @@ def init_app(app):
 
     @app.route("/agregar_pieza", methods=["POST"])
     def agregar_pieza():
-        """
-        Agrega una nueva pieza al inventario.
-        - Recibe datos desde el formulario (categoría, nombre, cantidad, precio).
-        - Valida que los campos sean correctos y que no exista duplicado.
-        - Calcula stock máximo mínimo de 3 unidades.
-        - Guarda el registro en la base de datos y confirma con mensaje flash.
-        """
         categoria   = request.form.get("categoria", "").strip().title()
         nombre      = request.form.get("nombre", "").strip().title()
         cantidad    = request.form.get("cantidad", type=int, default=0)
         precio      = request.form.get("precio", type=float, default=0.0)
+        costo       = request.form.get("costo", type=float, default=0.0)
 
         if not nombre or cantidad < 0 or precio <= 0:
             flash("Error: todos los campos son obligatorios y válidos", "error")
@@ -438,55 +442,72 @@ def init_app(app):
             nombre          = nombre,
             cantidad        = cantidad,
             stock_maximo    = stock_maximo,
-            precio_unitario = precio
+            precio_unitario = precio,
+            costo_unitario  = costo
         )
         db.session.add(nueva)
         db.session.commit()
         flash("Pieza agregada correctamente", "success")
         return redirect(url_for("inventario"))
 
-
-    @app.route("/editar_inventario/<int:id>", methods=["GET", "POST"])
+    @app.route("/editar_inventario/<int:id>", methods=["POST"])
     def editar_inventario(id):
-        """
-        Edita los datos de una pieza existente en el inventario.
-        - Verifica autorización de administrador.
-        - Permite modificar nombre y precio.
-        - Valida que los campos sean correctos.
-        - Actualiza la base de datos y confirma con mensaje flash.
-        """
         if not session.get("admin_autorizado"):
             flash("Acción restringida. Ingresa contraseña de admin.", "error")
             return redirect(url_for("inventario"))
 
         pieza = Inventario.query.get_or_404(id)
 
-        if request.method == "POST":
-            nuevo_nombre = request.form.get("nombre", "").strip().title()
-            nuevo_precio = request.form.get("precio", type=float)
+        # Recibir valores como texto
+        nuevo_nombre = request.form.get("nombre", "").strip()
+        nuevo_precio = request.form.get("precio", "").strip()
+        nuevo_costo  = request.form.get("costo", "").strip()
+        nuevo_margen = request.form.get("margen", "").strip()
 
-            if not nuevo_nombre or nuevo_precio <= 0:
-                flash("Error: nombre y precio válidos son obligatorios", "error")
-                return redirect(url_for("editar_inventario", id=id))
+        # Nombre
+        if nuevo_nombre:
+            pieza.nombre = nuevo_nombre.title()
 
-            pieza.nombre = nuevo_nombre
-            pieza.precio_unitario = nuevo_precio
-            db.session.commit()
-            flash("Pieza editada correctamente", "success")
-            return redirect(url_for("inventario_categoria", categoria=pieza.categoria.capitalize()))
+        # Precio
+        if nuevo_precio:
+            try:
+                pieza.precio_unitario = float(nuevo_precio)
+            except Exception:
+                flash("⚠️ Precio inválido, no se actualizó", "warning")
 
-        return render_template("editar_inventario.html", pieza=pieza)
+        # Costo
+        if nuevo_costo:
+            try:
+                pieza.costo_unitario = float(nuevo_costo)
+            except Exception:
+                flash("⚠️ Costo inválido, no se actualizó", "warning")
+
+        # Margen
+        if nuevo_margen:
+            try:
+                margen_float = float(nuevo_margen)
+                if pieza.costo_unitario and pieza.costo_unitario > 0:
+                    precio_calculado = pieza.costo_unitario * (1 + margen_float / 100)
+                    pieza.precio_unitario = round(precio_calculado / 5) * 5
+            except Exception:
+                flash("⚠️ Margen inválido, no se actualizó", "warning")
+
+        # 🔹 Siempre recalcular margen real si hay costo y precio
+        if pieza.costo_unitario and pieza.costo_unitario > 0 and pieza.precio_unitario:
+            try:
+                margen_real = ((pieza.precio_unitario - pieza.costo_unitario) / pieza.costo_unitario) * 100
+                flash(f"✅ Cambios guardados. Margen real: {round(margen_real, 2)}% (Precio: ${pieza.precio_unitario})", "success")
+            except Exception:
+                flash("✅ Cambios guardados (no se pudo calcular margen)", "success")
+        else:
+            flash("✅ Cambios guardados", "success")
+
+        db.session.commit()
+        return redirect(url_for("inventario_categoria", categoria=pieza.categoria.capitalize()))
 
 
     @app.route("/eliminar_inventario/<int:id>", methods=["POST"])
     def eliminar_inventario(id):
-        """
-        Elimina una pieza del inventario.
-        - Verifica autorización de administrador.
-        - Obtiene la pieza por su ID.
-        - Borra el registro de la base de datos.
-        - Redirige a la categoría correspondiente con mensaje flash.
-        """
         if not session.get("admin_autorizado"):
             flash("Acción restringida. Ingresa contraseña de admin.", "error")
             return redirect(url_for("inventario"))
@@ -498,24 +519,20 @@ def init_app(app):
         flash("Pieza eliminada correctamente", "success")
         return redirect(url_for("inventario_categoria", categoria=categoria))
 
-
     @app.route("/inventario")
     def inventario():
-        """
-        Muestra el inventario agrupado por categorías.
-        - Obtiene todas las categorías distintas.
-        - Calcula el estado de cada categoría según stock.
-        - Renderiza la plantilla inventario.html con los datos.
-        """
         categorias = []
         todas = db.session.query(Inventario.categoria).distinct().all()
         for c in todas:
+            if not c[0]:
+                continue
             nombre_cat = c[0].capitalize()
             piezas = Inventario.query.filter_by(categoria=c[0]).all()
 
-            # Calcular estado de la categoría
             estado = "green"
             for p in piezas:
+                if not p.stock_maximo or p.stock_maximo <= 0:
+                    continue
                 ratio = p.cantidad / p.stock_maximo if p.stock_maximo > 0 else 0
                 if p.cantidad <= 3 or ratio <= 0.33:
                     estado = "red"
@@ -526,27 +543,23 @@ def init_app(app):
 
         return render_template("inventario.html", categorias=categorias)
 
-
     @app.route("/inventario/<categoria>")
     def inventario_categoria(categoria):
-        """
-        Muestra las piezas de una categoría específica.
-        - Obtiene las piezas filtradas por categoría.
-        - Renderiza la plantilla inventario_categoria.html con los datos.
-        """
-        piezas = Inventario.query.filter_by(categoria=categoria.title()).all()
-        return render_template("inventario_categoria.html", categoria=categoria.title(), piezas=piezas)
+        piezas = Inventario.query.filter(Inventario.categoria.ilike(categoria)).all()
 
+        # Calcular margen dinámico
+        for p in piezas:
+            if p.costo_unitario and p.costo_unitario > 0:
+                p.margen = round(((p.precio_unitario - p.costo_unitario) / p.costo_unitario) * 100, 2)
+            else:
+                p.margen = 0
+
+        return render_template("inventario_categoria.html",
+                               categoria=categoria.capitalize(),
+                               piezas=piezas)
 
     @app.route("/restock/<int:id>", methods=["POST"])
     def restock(id):
-        """
-        Actualiza el stock de una pieza en el inventario.
-        - Verifica autorización de administrador.
-        - Recibe cantidad desde el formulario.
-        - Suma al stock actual y ajusta stock máximo si es necesario.
-        - Confirma la operación con mensaje flash.
-        """
         if not session.get("admin_autorizado"):
             flash("Acción restringida. Ingresa contraseña de admin.", "error")
             return redirect(url_for("inventario"))
@@ -564,6 +577,41 @@ def init_app(app):
 
         db.session.commit()
         flash("Stock actualizado correctamente", "success")
+        return redirect(url_for("inventario_categoria", categoria=pieza.categoria.capitalize()))
+
+    @app.route("/editar_margen/<int:pieza_id>", methods=["POST"])
+    def editar_margen(pieza_id):
+        """
+        Edita el margen de ganancia de una pieza.
+        - Recibe el porcentaje de margen desde el formulario.
+        - Calcula el nuevo precio unitario en base al costo.
+        - Redondea el precio al múltiplo de 5 más cercano.
+        - Recalcula el margen real después del redondeo.
+        - Actualiza la base de datos y confirma con mensaje flash.
+        """
+        pieza = Inventario.query.get_or_404(pieza_id)
+        try:
+            nuevo_margen = float(request.form["margen"])
+            if pieza.costo_unitario and pieza.costo_unitario > 0:
+                # Calcular nuevo precio en base al margen
+                precio_calculado = pieza.costo_unitario * (1 + nuevo_margen / 100)
+
+                # Redondear al múltiplo de 5 más cercano
+                precio_redondeado = round(precio_calculado / 5) * 5
+
+                # Actualizar precio_unitario
+                pieza.precio_unitario = precio_redondeado
+
+                # Recalcular margen real después del redondeo
+                margen_real = ((pieza.precio_unitario - pieza.costo_unitario) / pieza.costo_unitario) * 100
+
+                db.session.commit()
+                flash(f"✅ Margen ajustado: {round(margen_real, 2)}% (Precio: ${pieza.precio_unitario})")
+            else:
+                flash("❌ Error: la pieza no tiene costo válido", "error")
+        except Exception as e:
+            flash(f"❌ Error al actualizar margen: {e}", "error")
+
         return redirect(url_for("inventario_categoria", categoria=pieza.categoria.capitalize()))
 
 # ==========================
@@ -663,7 +711,7 @@ def init_app(app):
 
             nueva_venta = Venta(
                 producto_id      = inv.id if inv else None,
-                tipo             = "refaccion" if inv else "servicio",
+                tipo             = p.tipo,
                 cantidad_vendida = p.cantidad,
                 descripcion      = p.producto,
                 monto            = p.total,
@@ -701,7 +749,7 @@ def init_app(app):
         # Buscar en inventario
         inventario = Inventario.query.filter(Inventario.nombre.ilike(f"%{query}%")).all()
         for p in inventario:
-            ratio = p.cantidad / p.stock_maximo if p.stock_maximo > 0 else 0
+            ratio = p.cantidad / p.stock_maximo if p.stock_maximo > 0 else 0  # 🔹 CAMBIO: definir ratio
             estado = "green"
             leyenda = ""
             seleccionable = True
@@ -731,16 +779,17 @@ def init_app(app):
         for s in servicios:
             sugerencias.append({
                 "id": s.id,
-                "categoria": s.categoria.capitalize(),
+                "categoria": s.tipo.capitalize(),
                 "nombre": s.nombre.capitalize(),
                 "estado": "green",  # servicios no tienen stock
                 "leyenda": "",
                 "seleccionable": True,
                 "tipo": "servicio",
-                "precio": float(s.precio_base)
+                "precio": float(s.importe)
             })
 
         return jsonify(sugerencias)
+
 
 
 # ==========================
@@ -807,7 +856,7 @@ def init_app(app):
             nuevo = Servicio(
                 nombre=nombre,
                 categoria=categoria,
-                precio_base=0.0          # se podrá actualizar después
+                importe=0.0          # se podrá actualizar después
             )
             db.session.add(nuevo)
 
@@ -831,6 +880,7 @@ def init_app(app):
         producto     = request.form.get("producto", "").strip()
         cantidad_str = request.form.get("cantidad", "").strip()
         precio_str   = request.form.get("precio_unitario", "").strip()
+        tipo = request.form.get("tipo", "Servicio")
 
         # Validaciones básicas
         if not producto or not cantidad_str:
@@ -869,6 +919,7 @@ def init_app(app):
             producto       = producto,
             cantidad       = cantidad,
             precio_unitario = precio_unitario,
+            tipo = tipo,
             total          = cantidad * precio_unitario
         )
 
@@ -907,6 +958,100 @@ def init_app(app):
         return render_template("presupuesto.html", moto=moto, total=total)
 
 # ==========================
+#   GRUPO: REPORTES
+# ==========================
+    def reportes(df_ventas, df_totales, correo_destino=None):
+        mes_actual = datetime.now().strftime("%B").capitalize()
+        nombre_archivo = f"reportes/Reportes_{mes_actual}.xlsx"
+        os.makedirs("reportes", exist_ok=True)
+
+        # ✅ Calcular total en Ventas con cantidad + precio
+        df_ventas["total"] = df_ventas["cantidad"] * df_ventas["precio"]
+
+# ==========================
+# FORMATO PERSONALIZADO
+# ==========================
+        with pd.ExcelWriter(nombre_archivo, engine="xlsxwriter") as writer:
+            # 🔹 Separar productos y servicios
+            df_productos = df_ventas[df_ventas["tipo"] == "refaccion"].copy()
+            df_servicios = df_ventas[df_ventas["tipo"] == "servicio"].copy()
+
+            # 🔹 Renombrar hoja Ventas → Productos
+            df_productos.to_excel(writer, sheet_name="Productos", index=False)
+            df_servicios.to_excel(writer, sheet_name="Nomina", index=False)
+
+            workbook = writer.book
+            formato_encabezado = workbook.add_format({
+                'bold': True, 'bg_color': '#D9D9D9', 'font_color': 'black',
+                'align': 'center', 'valign': 'vcenter'
+            })
+            formato_fila_par = workbook.add_format({'bg_color': '#FFFFFF'})
+            formato_fila_impar = workbook.add_format({'bg_color': '#F2F2F2'})
+            formato_numero = workbook.add_format({'num_format': '#,##0.00'})
+            formato_fecha = workbook.add_format({'num_format': 'yyyy-mm-dd'})
+
+            # 🔹 Ajuste automático y formato de encabezados
+            for hoja, df in [("Productos", df_productos), ("Nomina", df_servicios)]:
+                ws = writer.sheets[hoja]
+                for col_num, value in enumerate(df.columns):
+                    ws.write(0, col_num, str(value).upper(), formato_encabezado)
+                    ws.set_column(col_num, col_num, 18)
+
+                # 🔹 Alternar colores de filas
+                for row_num in range(1, len(df) + 1):
+                    formato = formato_fila_par if row_num % 2 == 0 else formato_fila_impar
+                    ws.set_row(row_num, None, formato)
+
+                # 🔹 Fecha solo una vez por día
+                fechas = df["fecha"].astype(str).tolist()
+                for i in range(1, len(fechas)):
+                    if fechas[i] == fechas[i - 1]:
+                        ws.write(i + 1, df.columns.get_loc("fecha"), "", formato_fecha)
+
+                # 🔹 Total dinámico al final
+                ultima_fila = len(df) + 2
+                col_precio = df.columns.get_loc("precio")
+                col_total = df.columns.get_loc("total")
+                ws.write_formula(ultima_fila, col_precio, f"=SUM(E2:E{ultima_fila-1})", formato_numero)
+                ws.write_formula(ultima_fila, col_total, f"=SUM(F2:F{ultima_fila-1})", formato_numero)
+                ws.write(ultima_fila, df.columns.get_loc("producto"), "TOTAL GENERAL", formato_encabezado)
+
+            # 🔹 Eliminar hoja Totales si existe
+            if "Totales" in writer.sheets:
+                del writer.sheets["Totales"]
+
+    # Enviar por correo si aplica
+        if correo_destino:
+            enviar_reporte_por_correo(nombre_archivo, correo_destino)
+
+# ==========================
+#   FUNCIÓN AUXILIAR: envío por correo
+# ==========================
+    def enviar_reporte_por_correo(nombre_archivo, destinatario):
+        remitente = "tu_correo@gmail.com"
+        password = "tu_password_app"  # Usa contraseña de aplicación
+
+        msg = MIMEMultipart()
+        msg['From'] = remitente
+        msg['To'] = destinatario
+        msg['Subject'] = "Reporte de Caja"
+
+        with open(nombre_archivo, "rb") as f:
+            parte = MIMEBase('application', 'octet-stream')
+            parte.set_payload(f.read())
+            encoders.encode_base64(parte)
+            parte.add_header('Content-Disposition', f'attachment; filename={os.path.basename(nombre_archivo)}')
+            msg.attach(parte)
+
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(remitente, password)
+        server.sendmail(remitente, destinatario, msg.as_string())
+        server.quit()
+
+        print(f"✅ Reporte enviado por correo a {destinatario}")
+
+# ==========================
 #   GRUPO: SERVICIOS
 # ==========================
 
@@ -927,7 +1072,19 @@ def init_app(app):
             flash("Todos los campos son obligatorios", "error")
             return redirect("/servicios")
 
-        nuevo = Servicio(tipo=tipo, nombre=nombre, importe=float(importe))
+        try:
+            importe = float(importe)
+        except ValueError:
+            flash("El importe debe ser numérico", "error")
+            return redirect("/servicios")
+
+        # 🔹 CAMBIO: validar duplicado antes de insertar
+        existente = Servicio.query.filter(Servicio.nombre.ilike(nombre)).first()
+        if existente:
+            flash("Error: ya existe un servicio con ese nombre", "error")
+            return redirect("/servicios")
+
+        nuevo = Servicio(tipo=tipo, nombre=nombre, importe=importe)
         db.session.add(nuevo)
         db.session.commit()
         flash("Servicio agregado correctamente", "success")
@@ -942,53 +1099,17 @@ def init_app(app):
         - Agrupa los servicios por su tipo.
         - Renderiza la plantilla servicios.html con los datos.
         """
-        servicios = Servicio.query.all()
+        # 🔹 CAMBIO: obtener todos los servicios sin usar query ni sugerencias
+        lista_servicios = Servicio.query.all()  
+
+        # 🔹 CAMBIO: agrupar por tipo
         servicios_por_tipo = {}
-        for s in servicios:
+        for s in lista_servicios:
             if s.tipo not in servicios_por_tipo:
                 servicios_por_tipo[s.tipo] = []
             servicios_por_tipo[s.tipo].append(s)
-        return render_template("servicios.html", servicios_por_tipo=servicios_por_tipo)
 
-# ==========================
-#   GRUPO: PRODUCTO
-# ==========================
-
-    @app.route("/buscar_producto")
-    def buscar_producto():
-        """
-        Busca productos y servicios según un término.
-        - Recibe el término desde parámetros de la URL.
-        - Filtra coincidencias en Inventario y Servicios.
-        - Devuelve resultados en formato JSON con datos relevantes.
-        """
-        termino = request.args.get("q", "").strip()
-        resultados = []
-
-        if termino:
-            # Buscar en inventario
-            inventario = Inventario.query.filter(Inventario.nombre.ilike(f"%{termino}%")).all()
-            for item in inventario:
-                resultados.append({
-                    "id": item.id,
-                    "nombre": item.nombre,
-                    "precio": item.precio_unitario,
-                    "stock": item.stock,
-                    "tipo": "refaccion"
-                })
-
-            # Buscar en servicios
-            servicios = Servicio.query.filter(Servicio.nombre.ilike(f"%{termino}%")).all()
-            for s in servicios:
-                resultados.append({
-                    "id": None,
-                    "nombre": s.nombre,
-                    "precio": s.precio,
-                    "stock": None,
-                    "tipo": "servicio"
-                })
-
-        return jsonify(resultados)
+        return render_template("servicios.html", servicios_por_tipo=servicios_por_tipo)  # 🔹 CAMBIO: enviar agrupados
 
 # ==========================
 #   GRUPO: VENTAS
@@ -999,43 +1120,66 @@ def init_app(app):
         password = request.form.get("admin_pass")
         if password != "1602":
             flash("Contraseña incorrecta", "error")
-            return redirect("/ventas")
+            return redirect(url_for("ventas"))  # ✅ CAMBIO
 
-        # Exportar cierre a Excel usando modelo Venta
         ventas = Venta.query.all()
         df_ventas = pd.DataFrame([{
             "id": v.id,
-            "fecha": v.fecha,
+            "fecha": v.fecha.strftime("%Y-%m-%d"),
             "producto": v.descripcion,
+            "tipo": v.tipo,
             "cantidad": v.cantidad_vendida,
             "precio": v.monto,
             "total": v.monto
         } for v in ventas])
-        total_general = df_ventas["total"].sum()
 
-        # ⚠️ CAMBIO: ya no se consulta Nomina, solo se guarda el cálculo de nómina
-        total_servicios = db.session.query(db.func.sum(Venta.monto)).filter_by(tipo="servicio").scalar() or 0
+        correo_destino = request.form.get("correo_destino")  # ✅ CAMBIO
+
+        total_refacciones = db.session.query(db.func.sum(Venta.monto))\
+            .filter(db.func.lower(db.func.trim(Venta.tipo)) == "refaccion").scalar() or 0
+        total_servicios = db.session.query(db.func.sum(Venta.monto))\
+            .filter(db.func.lower(db.func.trim(Venta.tipo)) == "servicio").scalar() or 0
+
+        total_general = total_refacciones + total_servicios
         nomina = total_servicios * 0.20
-        df_nomina = pd.DataFrame([{"Nomina calculada": nomina}])
 
-        os.makedirs("reportes", exist_ok=True)
-        with pd.ExcelWriter("reportes/cierre_caja.xlsx", engine="openpyxl") as writer:
-            df_ventas.to_excel(writer, sheet_name="Ventas", index=False)
-            df_nomina.to_excel(writer, sheet_name="Nomina", index=False)
-            df_totales = pd.DataFrame([{"Total Ventas": total_general}])
-            df_totales.to_excel(writer, sheet_name="Totales", index=False)
+        if total_refacciones == 0 and total_servicios == 0:
+            flash("No se encontraron ventas válidas")
+            return redirect(url_for("ventas"))
+
+        df_totales = pd.DataFrame([{
+            "Total Refacciones": total_refacciones,
+            "Total Mano de Obra": total_servicios,
+            "Total General": total_general,
+            "Nomina": nomina
+        }])
+
+        if not ventas:
+            flash("No hay ventas registradas")
+            return redirect(url_for("ventas"))
+
+        reportes(df_ventas, df_totales, correo_destino)  # ✅ CAMBIO
 
         Venta.query.delete()
         db.session.commit()
 
-        flash("Caja cerrada, ventas reiniciadas y cierre exportado a Excel", "info")
-        return redirect("/ventas")
+        flash("Caja cerrada y cierre exportado a Excel", "info")
+        return render_template("caja.html",
+                               mostrar_modal=True,
+                               total_ventas=total_general,
+                               faltante=False)
+
 
     @app.route("/ventas")
     def ventas():
-        total_refacciones = db.session.query(db.func.sum(Venta.monto)).filter_by(tipo="refaccion").scalar() or 0
-        total_servicios   = db.session.query(db.func.sum(Venta.monto)).filter_by(tipo="servicio").scalar() or 0
-        total_general     = total_refacciones + total_servicios
+        # ✅ Corrección aplicada: usar "refaccion" en lugar de "producto"
+        total_refacciones = db.session.query(db.func.sum(Venta.monto))\
+            .filter(db.func.lower(db.func.trim(Venta.tipo)) == "refaccion").scalar() or 0  # 🔹 CAMBIO
+
+        total_servicios = db.session.query(db.func.sum(Venta.monto))\
+            .filter(db.func.lower(db.func.trim(Venta.tipo)) == "servicio").scalar() or 0
+
+        total_general = total_refacciones + total_servicios
 
         # ⚠️ CAMBIO: nómina como cálculo
         nomina = total_servicios * 0.20
@@ -1050,9 +1194,17 @@ def init_app(app):
             "total": v.monto
         } for v in lista])
 
+        # 🔹 CAMBIO: exportar también los totales a Excel (solo para visualización, no creación)
+        df_totales = pd.DataFrame([{
+            "Total Refacciones": total_refacciones,
+            "Total Mano de Obra": total_servicios,
+            "Total General": total_general,
+            "Nomina": nomina
+        }])
+
         return render_template(
             "ventas.html",
-            lista=lista,
+            ventas=lista,  # 🔹 CAMBIO: enviar como 'ventas' para coincidir con la plantilla
             total_refacciones=total_refacciones,
             total_servicios=total_servicios,
             total_general=total_general,
