@@ -11,14 +11,30 @@ LOCAL_VERSION = "1.0.0"
 VERSION_URL = "https://raw.githubusercontent.com/danielop9305/taller/main/version.json"
 
 app = Flask(__name__, template_folder="templates")
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
+# Detectar si corre como .exe o como script
+if getattr(sys, 'frozen', False):
+    BASE_DIR = os.path.dirname(sys.executable)  # Carpeta del ejecutable
+else:
+    BASE_DIR = os.path.abspath(os.path.dirname(__file__))  # Carpeta del proyecto
+
+# Ruta fija para la base externa
 db_path = os.path.join(BASE_DIR, "instance", "taller.db")
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{db_path}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.secret_key = "clave_secreta_segura"
 
+# Inicializar DB y migraciones
 db.init_app(app)
 migrate = Migrate(app, db)
+
+# Crear carpeta y base si no existen
+if not os.path.exists(os.path.join(BASE_DIR, "instance")):
+    os.makedirs(os.path.join(BASE_DIR, "instance"))
+
+if not os.path.exists(db_path):
+    with app.app_context():
+        db.create_all()
 
 def check_for_update():
     try:
@@ -60,8 +76,5 @@ routes.init_app(app)
 
 if __name__ == "__main__":
     check_for_update()
-    import webbrowser
     webbrowser.open("http://127.0.0.1:5000")
     app.run(debug=False, use_reloader=False)
-
-
