@@ -7,7 +7,8 @@ import os
 import sys
 import webbrowser
 
-LOCAL_VERSION = "1.0.0"
+with open("version.txt") as f:
+    LOCAL_VERSION = f.read().strip()
 VERSION_URL = "https://raw.githubusercontent.com/danielop9305/taller/main/version.json"
 
 
