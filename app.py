@@ -7,8 +7,12 @@ import os
 import sys
 import webbrowser
 
-with open("version.txt") as f:
-    LOCAL_VERSION = f.read().strip()
+try:
+    with open("version.txt") as f:
+        LOCAL_VERSION = f.read().strip()
+except FileNotFoundError:
+    LOCAL_VERSION = "0.0.0"  # valor por defecto si falta el archivo
+
 VERSION_URL = "https://raw.githubusercontent.com/danielop9305/taller/main/version.json"
 
 

@@ -92,6 +92,8 @@ IF %ERRORLEVEL% NEQ 0 (
     exit /b %ERRORLEVEL%
 )
 
+copy version.txt dist\
+
 echo =========================================
 echo Aplicando .gitignore optimizado...
 echo =========================================
