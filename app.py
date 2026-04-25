@@ -10,6 +10,7 @@ import webbrowser
 LOCAL_VERSION = "1.0.0"
 VERSION_URL = "https://raw.githubusercontent.com/danielop9305/taller/main/version.json"
 
+
 app = Flask(__name__, template_folder="templates")
 
 # Ruta fija en Program Files (independiente de donde esté el .exe)
