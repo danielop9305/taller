@@ -12,13 +12,10 @@ VERSION_URL = "https://raw.githubusercontent.com/danielop9305/taller/main/versio
 
 app = Flask(__name__, template_folder="templates")
 
-# Detectar si corre como .exe o como script
-if getattr(sys, 'frozen', False):
-    BASE_DIR = os.path.dirname(sys.executable)  # Carpeta del ejecutable
-else:
-    BASE_DIR = os.path.abspath(os.path.dirname(__file__))  # Carpeta del proyecto
+# Ruta fija en Program Files (independiente de donde esté el .exe)
+BASE_DIR = r"C:\MotoPinguino\instance"
 
-# Ruta fija para la base externa
+# Ruta de la base externa
 db_path = os.path.join(BASE_DIR, "instance", "taller.db")
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{db_path}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
