@@ -43,7 +43,6 @@ echo =========================================
 pyinstaller --onefile ^
  --add-data "templates;templates" ^
  --add-data "static;static" ^
- --add-data "instance/taller.db;instance" ^
  app.py
 
 IF %ERRORLEVEL% NEQ 0 (
@@ -90,7 +89,6 @@ IF %ERRORLEVEL% EQU 0 (
     echo =========================================
     gh release create %version% dist\app.exe --title "Version %version%" --notes "Compilacion automatica del %fecha%"
 )
-
 
 echo =========================================
 echo Proceso terminado correctamente.

@@ -26,14 +26,16 @@
                     <tbody>
                         {% for s in lista %}
                         <tr>
-                            <td><input type="checkbox" name="servicios_seleccionados" value="{{ s.id }}"></td>
                             <td>{{ s.nombre }}</td>
                             <td>${{ "%.2f"|format(s.importe) }}</td>
-                        </tr>
+                            <td>
+                                <input type="checkbox" name="servicios_seleccionados" value="{{ s.id }}">
+                                <button type="submit" style="margin-left:10px;">Agregar al carrito</button>
+                            </td>
+                        <tr>
                         {% endfor %}
                     </tbody>
-                </table>
-                <button type="submit">Agregar al carrito</button>
+                </table>                
             </form>
         </div>
     {% endfor %}
@@ -80,6 +82,13 @@
         }
         .tabla-servicios, .tabla-servicios th, .tabla-servicios td {
             border: 1px solid #000;
+        }
+        button[type="button"] {
+            margin-top: 20px;   /* espacio arriba de cada categoría */
+            margin-bottom: 10px; /* espacio debajo del botón */
+        }
+        .tabla-servicios {
+            margin-bottom: 25px; /* espacio debajo de cada tabla */
         }
     </style>
 {% endblock %}

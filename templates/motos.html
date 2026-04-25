@@ -55,7 +55,7 @@
                             <input type="text" id="producto" name="producto" required autocomplete="off">
                             <div id="sugerencias" style="border:1px solid #ccc; display:none; position:absolute; background:#fff; z-index:1000;"></div>
                             <label>Cantidad:</label>
-                            <input type="number" name="cantidad" min="1" required>
+                            <input type="number" name="cantidad" min="1" value="1" required> <!-- ✅ inicializa en 1 -->
                             <label>Precio unitario:</label>
                             <input type="number" id="precio_unitario" name="precio_unitario" step="0.01" required>
                             <button type="submit">Agregar al carrito</button>
@@ -64,7 +64,8 @@
                         <table border="1" cellspacing="0" cellpadding="5">
                             <thead>
                                 <tr>
-                                    <th>Producto</th>
+                                    <th>Producto/Servicio</th>
+                                    <th>Tipo</th> <!-- ✅ Nueva columna -->
                                     <th>Cantidad</th>
                                     <th>Total</th>
                                     <th>Acción</th>
@@ -74,6 +75,7 @@
                                 {% for p in m.presupuestos %}
                                 <tr>
                                     <td>{{ p.producto }}</td>
+                                    <td>{{ p.tipo }}</td> <!-- ✅ Mostrar tipo -->
                                     <td>{{ p.cantidad }}</td>
                                     <td>${{ "%.2f"|format(p.total) }}</td>
                                     <td>

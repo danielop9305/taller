@@ -9,39 +9,44 @@
         </ul>
       {% endif %}
     {% endwith %}
+
     <h2>Ventas</h2>
 
-    <table border="1" cellspacing="0" cellpadding="5">
-        <thead>
+    {% if ventas %}
+    <table style="border-collapse:collapse; width:100%; margin-top:20px;">
+        <thead style="background:#f0f0f0;">
             <tr>
-                <th>Fecha</th>
-                <th>Descripción</th>
-                <th>Tipo</th>
-                <th>Cantidad</th>
-                <th>Importe</th>
+                <th style="border:1px solid #ccc; padding:8px;">Fecha</th>
+                <th style="border:1px solid #ccc; padding:8px;">Descripción</th>
+                <th style="border:1px solid #ccc; padding:8px;">Tipo</th>
+                <th style="border:1px solid #ccc; padding:8px;">Cantidad</th>
+                <th style="border:1px solid #ccc; padding:8px;">Importe</th>
             </tr>
         </thead>
         <tbody>
-            {% for v in lista %}
+            {% for v in ventas %}
             <tr>
-                <td>{{ v.fecha.strftime("%Y-%m-%d") }}</td>
-                <td>{{ v.descripcion }}</td>
-                <td>{{ v.tipo }}</td>
-                <td>{{ v.cantidad_vendida }}</td>
-                <td>${{ "%.2f"|format(v.monto) }}</td>
+                <td style="border:1px solid #ccc; padding:8px;">{{ v.fecha.strftime("%Y-%m-%d %H:%M") }}</td>
+                <td style="border:1px solid #ccc; padding:8px;">{{ v.descripcion }}</td>
+                <td style="border:1px solid #ccc; padding:8px;">{{ v.tipo }}</td>
+                <td style="border:1px solid #ccc; padding:8px; text-align:center;">{{ v.cantidad_vendida }}</td>
+                <td style="border:1px solid #ccc; padding:8px; text-align:right;">${{ "%.2f"|format(v.monto) }}</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 
-    <p>Total Refacciones: ${{ "%.2f"|format(total_refacciones) }}</p>
+    <p style="margin-top:15px;">Total Refacciones: ${{ "%.2f"|format(total_refacciones) }}</p>
     <p>Total Mano de Obra: ${{ "%.2f"|format(total_servicios) }}</p>
     <p>Total General: ${{ "%.2f"|format(total_general) }}</p>
-     <p>Nómina: ${{ "%.2f"|format(nomina) }}</p>
+    <p>Nómina: ${{ "%.2f"|format(nomina) }}</p>
 
-    <form method="POST" action="/cerrar_caja">
+    <form method="POST" action="/cerrar_caja" style="margin-top:20px;">
         <label>Contraseña:</label>
-        <input type="password" name="admin_pass">
+        <input type="password" name="admin_pass" required>
         <button type="submit">Cerrar Caja</button>
     </form>
+    {% else %}
+    <p>No hay ventas registradas.</p>
+    {% endif %}
 {% endblock %}

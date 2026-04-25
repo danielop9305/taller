@@ -53,47 +53,73 @@ def init_app(app):
     @app.route("/agregar_carrito", methods=["POST"])
     def agregar_al_carrito():
         """
-        Agrega un producto del inventario al carrito.
-        - Valida existencia y stock del producto.
+        Agrega un producto o servicio al carrito.
+        - Si recibe producto_id: valida existencia y stock en Inventario.
+        - Si recibe servicio_id: valida existencia en Servicios.
         - Calcula total y lo añade a la sesión.
         - Confirma con mensaje flash.
         """
         producto_id = request.form.get("producto_id", type=int)
-        cantidad    = request.form.get("cantidad", type=int, default=0)
-
-        producto = Inventario.query.get(producto_id)
-        if not producto:
-            flash("Producto no encontrado en inventario", "error")
-            return redirect(url_for("carrito"))
-
-        if producto.cantidad <= 0:
-            flash("Error: producto sin inventario", "error")
-            return redirect(url_for("carrito"))
-
-        if cantidad <= 0:
-            flash("Error: cantidad inválida", "error")
-            return redirect(url_for("carrito"))
-
-        if cantidad > producto.cantidad:
-            flash("Error: no hay suficiente stock", "error")
-            return redirect(url_for("carrito"))
-
-        precio_unitario = float(producto.precio_unitario)
-        total = precio_unitario * cantidad
+        servicio_id = request.form.get("servicio_id", type=int)
+        cantidad    = request.form.get("cantidad", type=int, default=1)
 
         carrito = session.get("carrito", [])
-        carrito.append({
-            "id": len(carrito) + 1,
-            "producto_id": producto.id,
-            "nombre": producto.nombre,
-            "cantidad": cantidad,
-            "precio_unitario": precio_unitario,
-            "total": total,
-            "tipo": "refaccion"
-        })
-        session["carrito"] = carrito
 
-        flash("Producto agregado al carrito", "success")
+        # Caso producto
+        if producto_id:
+            producto = Inventario.query.get(producto_id)
+            if not producto:
+                flash("Producto no encontrado en inventario", "error")
+                return redirect(url_for("carrito"))
+
+            if producto.cantidad <= 0:
+                flash("Error: producto sin inventario", "error")
+                return redirect(url_for("carrito"))
+
+            if cantidad <= 0:
+                flash("Error: cantidad inválida", "error")
+                return redirect(url_for("carrito"))
+
+            if cantidad > producto.cantidad:
+                flash("Error: no hay suficiente stock", "error")
+                return redirect(url_for("carrito"))
+
+            precio_unitario = float(producto.precio_unitario)
+            total = precio_unitario * cantidad
+
+            carrito.append({
+                "id": len(carrito) + 1,
+                "producto_id": producto.id,
+                "nombre": producto.nombre,
+                "cantidad": cantidad,
+                "precio_unitario": precio_unitario,
+                "total": total,
+                "tipo": "refaccion"
+            })
+            flash("Producto agregado al carrito", "success")
+
+        # Caso servicio
+        elif servicio_id:
+            servicio = Servicio.query.get(servicio_id)
+            if not servicio:
+                flash("Servicio no encontrado", "error")
+                return redirect(url_for("carrito"))
+
+            carrito.append({
+                "id": len(carrito) + 1,
+                "producto_id": None,
+                "nombre": servicio.nombre,
+                "cantidad": 1,
+                "precio_unitario": servicio.importe,
+                "total": servicio.importe,
+                "tipo": "servicio"
+            })
+            flash("Servicio agregado al carrito", "success")
+
+        else:
+            flash("Error: no seleccionaste producto ni servicio", "error")
+
+        session["carrito"] = carrito
         return redirect(url_for("carrito"))
 
     @app.route("/agregar_servicio_carrito/<int:servicio_id>")
@@ -251,15 +277,61 @@ def init_app(app):
     @app.route("/eliminar_del_carrito/<int:id>", methods=["POST"])
     def eliminar_del_carrito(id):
         """
-        Elimina un ítem del carrito.
-        - Recibe el ID interno del ítem.
-        - Filtra la lista y actualiza la sesión.
-        - Redirige a la vista de carrito.
+        Elimina un ítem específico del carrito.
         """
-        session["carrito"] = []
-        session.pop("recibido", None)
-        session.pop("cambio", None)
+        carrito = session.get("carrito", [])
+        carrito = [item for item in carrito if item["id"] != id]
+        session["carrito"] = carrito
+        flash("Ítem eliminado del carrito", "info")
         return redirect(url_for("carrito"))
+
+    @app.route("/sugerir_producto_inventario")
+    def sugerir_producto_inventario():
+        """
+        Devuelve coincidencias de productos del inventario para el autocompletado.
+        - Busca por nombre en la tabla Inventario.
+        - Retorna JSON con id, nombre, categoría y estado dinámico según stock.
+        """
+        q = request.args.get("q", "").strip()
+        resultados = []
+        if q:
+            productos = Inventario.query.filter(Inventario.nombre.ilike(f"%{q}%")).all()
+            for p in productos:
+                # Calcular ratio de stock
+                ratio = p.cantidad / p.stock_maximo if p.stock_maximo and p.stock_maximo > 0 else 0
+                if p.cantidad <= 3 or ratio <= 0.33:
+                    color = "red"
+                    leyenda = "Stock crítico"
+                elif ratio <= 0.66:
+                    color = "orange"
+                    leyenda = "Stock medio"
+                else:
+                    color = "green"
+                    leyenda = "Stock suficiente"
+
+                resultados.append({
+                    "id": p.id,
+                    "nombre": p.nombre,
+                    "categoria": p.categoria,
+                    "estado": color,
+                    "leyenda": leyenda,
+                    "seleccionable": p.cantidad > 0
+                })
+        return jsonify(resultados)
+
+    @app.route("/sugerir_servicio")
+    def sugerir_servicio():
+        q = request.args.get("q", "").strip()
+        resultados = []
+        if q:
+            servicios = Servicio.query.filter(Servicio.nombre.ilike(f"%{q}%")).all()
+            for s in servicios:
+                resultados.append({
+                    "id": s.id,
+                    "nombre": s.nombre,
+                    "tipo": s.tipo
+                })
+        return jsonify(resultados)
 
 # ==========================
 #   GRUPO: CLIENTES
@@ -704,15 +776,16 @@ def init_app(app):
             inv = Inventario.query.filter_by(nombre=p.producto).first()
             if inv:
                 if inv.cantidad >= p.cantidad:
-                    inv.cantidad -= p.cantidad   # ← único lugar donde se descuenta
-                    inv.reservado -= p.cantidad  # ← liberar reserva
+                    inv.cantidad -= p.cantidad   # ✅ descuenta inventario
+                    inv.reservado -= p.cantidad  # ✅ libera reserva
                 else:
                     flash(f"Stock insuficiente para {p.producto}, se registró igualmente.", "warning")
 
+            # ✅ Corrección: usar p.tipo y fallback cantidad=1
             nueva_venta = Venta(
-                producto_id      = inv.id if inv else None,
+                producto_id = None if p.tipo == "Servicio" else inv.id if inv else None,
                 tipo             = p.tipo,
-                cantidad_vendida = p.cantidad,
+                cantidad_vendida = p.cantidad if p.cantidad else 1,
                 descripcion      = p.producto,
                 monto            = p.total,
                 fecha            = datetime.now()
@@ -730,7 +803,7 @@ def init_app(app):
         """
         Muestra las motos asociadas a un cliente.
         - Obtiene el cliente por su ID.
-        - Renderiza la plantilla motos.html con la información del cliente.
+        - Renderiza la plantilla motos.html con la información del cliente y sus presupuestos.
         """
         cliente = Cliente.query.get_or_404(cliente_id)
         return render_template("motos.html", cliente=cliente)
@@ -871,8 +944,8 @@ def init_app(app):
         """
         Agrega un producto o servicio al presupuesto de la moto.
         - Valida que el precio unitario no esté vacío.
-        - Si el producto existe en Inventario o Servicios, lo usa directamente.
-        - Si no existe, lo agrega como entrada libre (el modal ya gestiona la opción de añadirlo a listas).
+        - Identifica automáticamente si es Refacción (Inventario) o Servicio.
+        - Si no existe en ninguna lista, lo agrega como entrada libre.
         """
 
         moto = Moto.query.get_or_404(moto_id)
@@ -880,47 +953,50 @@ def init_app(app):
         producto     = request.form.get("producto", "").strip()
         cantidad_str = request.form.get("cantidad", "").strip()
         precio_str   = request.form.get("precio_unitario", "").strip()
-        tipo = request.form.get("tipo", "Servicio")
 
-        # Validaciones básicas
-        if not producto or not cantidad_str:
-            flash("Error: producto o cantidad vacíos", "error")
-            return redirect(url_for("motos", cliente_id=moto.cliente_id))
-
+        # ✅ Cantidad siempre inicializa en 1
         try:
-            cantidad = int(cantidad_str)
+            cantidad = int(cantidad_str) if cantidad_str else 1
         except ValueError:
-            flash("Error: cantidad inválida", "error")
+            cantidad = 1
+
+        # ✅ Validación de producto
+        if not producto:
+            flash("Error: producto vacío", "error")
             return redirect(url_for("motos", cliente_id=moto.cliente_id))
 
-        if not precio_str:
-            precio_unitario = 0.0
-        else:
-            try:
-                precio_unitario = float(precio_str)
-            except ValueError:
-                flash("Error: precio inválido", "error")
-                return redirect(url_for("motos", cliente_id=moto.cliente_id))
+        # ✅ Precio unitario seguro
+        try:
+            precio_unitario = float(precio_str) if precio_str else 0.0
+        except ValueError:
+            flash("Error: precio inválido", "error")
+            return redirect(url_for("motos", cliente_id=moto.cliente_id))
 
-        # Buscar si el producto existe en Inventario
+        # ✅ Identificación automática
+        tipo = None
         inv = Inventario.query.filter_by(nombre=producto).first()
+        serv = Servicio.query.filter_by(nombre=producto).first()
+
         if inv:
+            tipo = "Refacción"
             disponible = inv.cantidad - inv.reservado
             if disponible >= cantidad:
                 inv.reservado += cantidad
             else:
-               flash("Advertencia: stock insuficiente, se agregó igualmente", "warning")
+                flash("Advertencia: stock insuficiente, se agregó igualmente", "warning")
+        elif serv:
+            tipo = "Servicio"
+        else:
+            tipo = "Libre"  # entrada manual
 
-        serv = Servicio.query.filter_by(nombre=producto).first()
-
-        # Crear registro de presupuesto con total calculado
+        # ✅ Crear registro de presupuesto
         nuevo = Presupuesto(
-            moto_id        = moto.id,
-            producto       = producto,
-            cantidad       = cantidad,
-            precio_unitario = precio_unitario,
-            tipo = tipo,
-            total          = cantidad * precio_unitario
+            moto_id=moto.id,
+            producto=producto,
+            cantidad=cantidad,
+            precio_unitario=precio_unitario,
+            tipo=tipo,
+            total=cantidad * precio_unitario
         )
 
         db.session.add(nuevo)
@@ -928,7 +1004,6 @@ def init_app(app):
 
         flash("Producto/servicio agregado al presupuesto", "success")
         return redirect(url_for("motos", cliente_id=moto.cliente_id))
-
 
     @app.route("/eliminar_presupuesto/<int:presupuesto_id>", methods=["POST"])
     def eliminar_presupuesto(presupuesto_id):
@@ -1183,7 +1258,7 @@ def init_app(app):
 
         # ⚠️ CAMBIO: nómina como cálculo
         nomina = total_servicios * 0.20
-        lista = Venta.query.all()
+        ventas = Venta.query.all()
 
         df_ventas = pd.DataFrame([{
             "id": v.id,
@@ -1192,7 +1267,7 @@ def init_app(app):
             "cantidad": v.cantidad_vendida,
             "precio": v.monto,
             "total": v.monto
-        } for v in lista])
+        } for v in ventas])
 
         # 🔹 CAMBIO: exportar también los totales a Excel (solo para visualización, no creación)
         df_totales = pd.DataFrame([{
@@ -1204,7 +1279,7 @@ def init_app(app):
 
         return render_template(
             "ventas.html",
-            ventas=lista,  # 🔹 CAMBIO: enviar como 'ventas' para coincidir con la plantilla
+            ventas=ventas,  # 🔹 CAMBIO: enviar como 'ventas' para coincidir con la plantilla
             total_refacciones=total_refacciones,
             total_servicios=total_servicios,
             total_general=total_general,

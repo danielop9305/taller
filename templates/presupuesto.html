@@ -1,85 +1,138 @@
-<!-- Formulario de presupuesto -->
-<form method="POST" action="/agregar_presupuesto/{{ moto.id }}" id="formPresupuesto">
-    <label>Producto o Servicio:</label>
-    <input type="text" id="producto" name="producto" required autocomplete="off" placeholder="Buscar producto o servicio...">
-    <div id="sugerencias" style="border:1px solid #ccc; display:none; position:absolute; background:#fff; max-height:200px; overflow-y:auto;"></div>
+{% extends "base.html" %}
+{% block content %}
+    <h2>Motos de {{ cliente.nombre }}</h2>
 
-    <label>Cantidad:</label>
-    <input type="number" name="cantidad" min="1" required>
+    {% for moto in cliente.lista_motos %}
+        <div style="border:1px solid #ccc; padding:15px; margin-bottom:20px;">
+            <h3>Moto: {{ moto.modelo }} - Placa: {{ moto.placa }}</h3>
 
-    <label>Precio unitario:</label>
-    <input type="number" id="precio_unitario" name="precio_unitario" step="0.01" required>
+            <!-- Formulario de presupuesto -->
+            <h4>Agregar al presupuesto</h4>
+            <form method="POST" action="/agregar_presupuesto/{{ moto.id }}" id="formPresupuesto">
+                <label>Producto o Servicio:</label>
+                <input type="text" id="producto" name="producto" required autocomplete="off" placeholder="Buscar producto o servicio...">
+                <div id="sugerencias" style="border:1px solid #ccc; display:none; position:absolute; background:#fff; max-height:200px; overflow-y:auto;"></div>
 
-    <button type="submit">Agregar al carrito</button>
-</form>
+                <label>Cantidad:</label>
+                <input type="number" name="cantidad" min="1" value="1" required> <!-- ✅ inicializa en 1 -->
 
-<!-- Modal emergente -->
-<div id="modalNoExiste" style="display:none; position:fixed; top:30%; left:35%; background:#fff; border:1px solid #000; padding:20px; z-index:1000;">
-    <p>El producto o servicio no existe en las listas.</p>
-    <button id="btnAgregarLista">Agregar a lista</button>
-    <button id="btnNoAgregar">No agregar</button>
-</div>
+                <label>Precio unitario:</label>
+                <input type="number" id="precio_unitario" name="precio_unitario" step="0.01" required>
 
-<!-- Modal categoría -->
-<div id="modalCategoria" style="display:none; position:fixed; top:30%; left:35%; background:#fff; border:1px solid #000; padding:20px; z-index:1000;">
-    <p>¿Es un producto o un servicio?</p>
-    <button onclick="seleccionarTipo('producto')">Producto</button>
-    <button onclick="seleccionarTipo('servicio')">Servicio</button>
-    <div id="categoriaForm" style="margin-top:10px; display:none;">
-        <label>Categoría:</label>
-        <input type="text" id="categoriaNueva">
-        <button onclick="guardarEnLista()">Guardar</button>
+                 <input type="hidden" id="tipo" name="tipo" value="">
+
+                <button type="submit">Agregar al carrito</button>
+            </form>
+
+            <!-- Tabla de presupuesto -->
+            {% if moto.presupuestos %}
+            <table style="border-collapse:collapse; width:100%; margin-top:20px;">
+                <thead style="background:#f0f0f0;">
+                    <tr>
+                        <th style="border:1px solid #ccc; padding:8px;">Producto/Servicio</th>
+                        <th style="border:1px solid #ccc; padding:8px;">Tipo</th> <!-- ✅ Refacción/Servicio -->
+                        <th style="border:1px solid #ccc; padding:8px;">Cantidad</th>
+                        <th style="border:1px solid #ccc; padding:8px;">Precio Unitario</th>
+                        <th style="border:1px solid #ccc; padding:8px;">Total</th>
+                        <th style="border:1px solid #ccc; padding:8px;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in moto.presupuestos %}
+                    <tr>
+                        <td style="border:1px solid #ccc; padding:8px;">{{ p.producto }}</td>
+                        <td style="border:1px solid #ccc; padding:8px;">{{ p.tipo }}</td> <!-- ✅ Mostrar tipo -->
+                        <td style="border:1px solid #ccc; padding:8px; text-align:center;">{{ p.cantidad }}</td>
+                        <td style="border:1px solid #ccc; padding:8px; text-align:right;">${{ "%.2f"|format(p.precio_unitario) }}</td>
+                        <td style="border:1px solid #ccc; padding:8px; text-align:right;">${{ "%.2f"|format(p.total) }}</td>
+                        <td style="border:1px solid #ccc; padding:8px; text-align:center;">
+                            <form method="POST" action="{{ url_for('eliminar_presupuesto', presupuesto_id=p.id) }}">
+                                <button type="submit">Eliminar</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <p style="margin-top:15px; font-weight:bold;">Total Presupuesto: ${{ "%.2f"|format(moto.total_presupuesto) }}</p>
+            {% else %}
+            <p>No hay partidas en el presupuesto.</p>
+            {% endif %}
+        </div>
+    {% endfor %}
+
+    <!-- Modal emergente -->
+    <div id="modalNoExiste" style="display:none; position:fixed; top:30%; left:35%; background:#fff; border:1px solid #000; padding:20px; z-index:1000;">
+        <p>El producto o servicio no existe en las listas.</p>
+        <button id="btnAgregarLista">Agregar a lista</button>
+        <button id="btnNoAgregar">No agregar</button>
     </div>
-</div>
 
-<script>
-const formPresupuesto = document.getElementById("formPresupuesto");
-const modalNoExiste = document.getElementById("modalNoExiste");
-const modalCategoria = document.getElementById("modalCategoria");
-let productoPendiente = null;
+    <!-- Modal categoría -->
+    <div id="modalCategoria" style="display:none; position:fixed; top:30%; left:35%; background:#fff; border:1px solid #000; padding:20px; z-index:1000;">
+        <p>¿Es un producto o un servicio?</p>
+        <button onclick="seleccionarTipo('producto')">Producto</button>
+        <button onclick="seleccionarTipo('servicio')">Servicio</button>
+        <div id="categoriaForm" style="margin-top:10px; display:none;">
+            <label>Categoría:</label>
+            <input type="text" id="categoriaNueva">
+            <button onclick="guardarEnLista()">Guardar</button>
+        </div>
+    </div>
 
-formPresupuesto.addEventListener("submit", function(e) {
-    const precio = document.getElementById("precio_unitario").value;
-    if (!precio) {
-        e.preventDefault();
-        modalNoExiste.style.display = "block";
-        productoPendiente = document.getElementById("producto").value;
+    <script>
+    const formPresupuesto = document.getElementById("formPresupuesto");
+    const modalNoExiste = document.getElementById("modalNoExiste");
+    const modalCategoria = document.getElementById("modalCategoria");
+    let productoPendiente = null;
+
+    // ✅ Validación: si no hay precio, abre modal
+    formPresupuesto.addEventListener("submit", function(e) {
+        const precio = document.getElementById("precio_unitario").value;
+        if (!precio) {
+            e.preventDefault();
+            modalNoExiste.style.display = "block";
+            productoPendiente = document.getElementById("producto").value;
+        }
+    });
+
+    // ✅ Botón "No agregar": cierra modal y envía formulario
+    document.getElementById("btnNoAgregar").onclick = function() {
+        modalNoExiste.style.display = "none";
+        formPresupuesto.submit();
+    };
+
+    // ✅ Botón "Agregar a lista": abre modal de categoría
+    document.getElementById("btnAgregarLista").onclick = function() {
+        modalNoExiste.style.display = "none";
+        modalCategoria.style.display = "block";
+    };
+
+    // ✅ Selección de tipo (producto/servicio)
+    function seleccionarTipo(tipo) {
+        document.getElementById("categoriaForm").style.display = "block";
+        modalCategoria.dataset.tipo = tipo;
     }
-});
 
-document.getElementById("btnNoAgregar").onclick = function() {
-    modalNoExiste.style.display = "none";
-    formPresupuesto.submit(); // agrega normalmente a la tabla
-};
+    // ✅ Guardar en lista vía fetch
+    function guardarEnLista() {
+        const tipo = modalCategoria.dataset.tipo;
+        const categoria = document.getElementById("categoriaNueva").value;
+        modalCategoria.style.display = "none";
 
-document.getElementById("btnAgregarLista").onclick = function() {
-    modalNoExiste.style.display = "none";
-    modalCategoria.style.display = "block";
-};
+        fetch("/agregar_a_lista", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                nombre: productoPendiente,
+                tipo: tipo,
+                categoria: categoria
+            })
+        }).then(res => res.json())
+          .then(data => alert("Agregado a lista correctamente"));
 
-function seleccionarTipo(tipo) {
-    document.getElementById("categoriaForm").style.display = "block";
-    modalCategoria.dataset.tipo = tipo;
-}
-
-function guardarEnLista() {
-    const tipo = modalCategoria.dataset.tipo;
-    const categoria = document.getElementById("categoriaNueva").value;
-    modalCategoria.style.display = "none";
-
-    // Aquí deberías hacer un fetch POST a tu backend para guardar en Inventario o Servicios
-    fetch("/agregar_a_lista", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({
-            nombre: productoPendiente,
-            tipo: tipo,
-            categoria: categoria
-        })
-    }).then(res => res.json())
-      .then(data => alert("Agregado a lista correctamente"));
-
-    // Luego se puede enviar el formulario normalmente
-    formPresupuesto.submit();
-}
-</script>
+        formPresupuesto.submit();
+    }
+    </script>
+{% endblock %}

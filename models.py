@@ -37,7 +37,6 @@ class Compatibilidad(db.Model):
 
     refaccion = db.relationship("Inventario", backref=db.backref("compatibilidades", lazy=True))
 
-
 class Inventario(db.Model):
     __tablename__ = "inventario"
 
@@ -57,8 +56,6 @@ class Nomina(db.Model):
     __tablename__ = "nomina"
     id = db.Column(db.Integer, primary_key=True)
     sueldo = db.Column(db.Float, nullable=False)
-
-
 
 class Moto(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -90,9 +87,10 @@ class Presupuesto(db.Model):
     __tablename__ = "presupuesto"
     id = db.Column(db.Integer, primary_key=True)
     producto = db.Column(db.String(100), nullable=False)
-    cantidad = db.Column(db.Integer, nullable=False)
+    cantidad = db.Column(db.Integer, nullable=False, default=1)
     precio_unitario = db.Column(db.Float, default=0.0)
     total = db.Column(db.Float, default=0.0)
+    tipo = db.Column(db.String(50), default="Servicio")
     moto_id = db.Column(
         db.Integer,
         db.ForeignKey("moto.id", name="fk_presupuesto_moto_id"),
