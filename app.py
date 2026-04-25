@@ -17,7 +17,7 @@ app = Flask(__name__, template_folder="templates")
 BASE_DIR = r"C:\MotoPinguino\instance"
 
 # Ruta de la base externa
-db_path = os.path.join(BASE_DIR, "instance", "taller.db")
+db_path = os.path.join(BASE_DIR, "taller.db")
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{db_path}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.secret_key = "clave_secreta_segura"
@@ -27,8 +27,8 @@ db.init_app(app)
 migrate = Migrate(app, db)
 
 # Crear carpeta y base si no existen
-if not os.path.exists(os.path.join(BASE_DIR, "instance")):
-    os.makedirs(os.path.join(BASE_DIR, "instance"))
+if not os.path.exists(BASE_DIR):
+    os.makedirs(BASE_DIR)
 
 if not os.path.exists(db_path):
     with app.app_context():
