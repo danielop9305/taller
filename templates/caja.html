@@ -9,14 +9,19 @@
         </ul>
       {% endif %}
     {% endwith %}
+
     <h2>Caja actual</h2>
 
     <p>Total de ventas acumuladas: ${{ "%.2f"|format(total_ventas) }}</p>
 
-    <form method="POST" action="/cerrar_caja">
-        <label>Contraseña:</label>
-        <input type="password" name="admin_pass">
-        <button type="submit">Cerrar Caja</button>
+    <form method="POST" action="/cerrar_caja" style="display:flex; flex-direction:column; gap:10px; max-width:300px;">
+        <label for="admin_pass">Contraseña de administrador:</label>
+        <input type="password" id="admin_pass" name="admin_pass" required>
+
+        <label for="correo_destino">Correo destino para enviar reporte:</label>
+        <input type="email" id="correo_destino" name="correo_destino" placeholder="ejemplo@correo.com" required>
+
+        <button type="submit" style="margin-top:10px;">Cerrar Caja</button>
     </form>
 
     {% if faltante %}

@@ -3,6 +3,14 @@ from datetime import datetime
 
 db = SQLAlchemy()
 
+class Anticipo(db.Model):
+    __tablename__ = "anticipo"
+
+    id = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey("clientes.id"), nullable=False)
+    monto = db.Column(db.Float, nullable=False)
+    fecha = db.Column(db.DateTime, default=datetime.utcnow)
+
 class Caja(db.Model):
     __tablename__ = "caja"
     id = db.Column(db.Integer, primary_key=True)
@@ -12,6 +20,8 @@ class Caja(db.Model):
     pagos = db.relationship("Pago", backref="caja", cascade="all, delete-orphan")
 
 class Cliente(db.Model):
+    __tablename__ = "clientes"
+
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(100), nullable=False)
     celular = db.Column(db.String(20), nullable=False)
@@ -23,12 +33,39 @@ class Cliente(db.Model):
     descripcion_problema = db.Column(db.Text, nullable=True) # descripción detallada del problema
     problemas_ocultos = db.Column(db.Boolean, default=False) # cláusula de problemas ocultos aceptada
 
+    # 🔹 Relación con motos
     lista_motos = db.relationship(
-        'Moto',
-        backref='cliente',
+        "Moto",
+        backref="cliente",
         lazy=True,
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
+        foreign_keys="Moto.cliente_id"   # ⚠️ CAMBIO: se especifica la FK
     )
+
+    # 🔹 Relación con anticipos (historial)
+    anticipos = db.relationship("Anticipo", backref="cliente", lazy=True, cascade="all, delete-orphan")
+
+    # 🔹 Relación con refacciones del cliente
+    refacciones_cliente = db.relationship("RefaccionCliente", backref="cliente", lazy=True, cascade="all, delete-orphan")
+
+    # 🔹 Fechas
+    fecha_ingreso = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha_entrega = db.Column(db.DateTime, nullable=True)
+
+    # 🔹 Tipo siempre forzado a “Servicio”
+    tipo = db.Column(db.String(50), nullable=False, default="Servicio")
+
+    def __init__(self, nombre, celular, descripcion_problema=None, problemas_ocultos=False, fecha_ingreso=None, fecha_entrega=None, tipo="Servicio"):
+        self.nombre = nombre.strip().title()
+        self.celular = celular.strip()
+        self.descripcion_problema = descripcion_problema
+        self.problemas_ocultos = problemas_ocultos
+        self.fecha_ingreso = fecha_ingreso or datetime.utcnow()
+        self.fecha_entrega = fecha_entrega
+        # 🔹 Validación: nunca guardar “Libre”
+        self.tipo = "Servicio" if tipo == "Libre" else tipo
+
+
 
 class Compatibilidad(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -62,7 +99,8 @@ class Moto(db.Model):
     modelo = db.Column(db.String(100))
     estado = db.Column(db.Integer, default=1)
     confirmado = db.Column(db.Boolean, default=False)
-    cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'))
+    cliente_id = db.Column(db.Integer, db.ForeignKey("clientes.id"), nullable=False)  # ⚠️ CAMBIO
+
 
     presupuestos = db.relationship(
         'Presupuesto',
@@ -101,16 +139,12 @@ class RefaccionCliente(db.Model):
     __tablename__ = "refaccion_cliente"
 
     id = db.Column(db.Integer, primary_key=True)
-    cliente_id = db.Column(db.Integer, db.ForeignKey("cliente.id", ondelete="CASCADE"), nullable=False)
+    cliente_id = db.Column(db.Integer, db.ForeignKey("clientes.id"), nullable=False)
     nombre = db.Column(db.String(100), nullable=False)
     cantidad = db.Column(db.Integer, default=1)
     estado = db.Column(db.String(50), nullable=True)
     firma_recepcion = db.Column(db.Boolean, default=False)
 
-    cliente = db.relationship(
-        "Cliente",
-        backref=db.backref("refacciones_cliente", lazy=True, cascade="all, delete-orphan")
-    )
 
 class Servicio(db.Model):
     __tablename__ = "servicio"

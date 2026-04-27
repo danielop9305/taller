@@ -1,0 +1,74 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.3, pytest-9.0.3, pluggy-1.6.0 -- C:\Users\danie\OneDrive\Documents\App moto pingu\venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\danie\OneDrive\Documents\App moto pingu
+collecting ... collected 27 items
+
+tests/test_app.py::test_get_routes[/] / : 200
+PASSED
+tests/test_app.py::test_get_routes[/reset_sesion] /reset_sesion : 302
+PASSED
+tests/test_app.py::test_get_routes[/validar_admin] /validar_admin : 405
+PASSED
+tests/test_app.py::test_get_routes[/cerrar_admin] /cerrar_admin : 405
+PASSED
+tests/test_app.py::test_get_routes[/carrito] /carrito : 200
+PASSED
+tests/test_app.py::test_get_routes[/cancelar_carrito] /cancelar_carrito : 405
+PASSED
+tests/test_app.py::test_get_routes[/clientes] Ruta de templates usada: templates
+Ruta absoluta de clientes.html: templates\clientes.html
+/clientes : 200
+PASSED
+tests/test_app.py::test_get_routes[/motos/1] /motos/1 : 404
+PASSED
+tests/test_app.py::test_get_routes[/dashboard] /dashboard : 200
+PASSED
+tests/test_app.py::test_get_routes[/inventario] /inventario : 200
+PASSED
+tests/test_app.py::test_get_routes[/sugerir_producto] /sugerir_producto : 200
+PASSED
+tests/test_app.py::test_get_routes[/pagos] /pagos : 200
+PASSED
+tests/test_app.py::test_get_routes[/presupuesto/1] /presupuesto/1 : 404
+SKIPPED (Ruta /pr...)
+tests/test_app.py::test_get_routes[/reportes] /reportes : 500
+SKIPPED (Ruta /reporte...)
+tests/test_app.py::test_get_routes[/servicios] /servicios : 200
+PASSED
+tests/test_app.py::test_get_routes[/ventas] /ventas : 200
+PASSED
+tests/test_app.py::test_get_routes[/ventas_resumen] /ventas_resumen : 200
+PASSED
+tests/test_app.py::test_post_routes[/agregar_cliente] /agregar_cliente : 400
+PASSED
+tests/test_app.py::test_post_routes[/agregar_pieza] /agregar_pieza : 302
+PASSED
+tests/test_app.py::test_post_routes[/agregar_servicio] /agregar_servicio : 302
+PASSED
+tests/test_app.py::test_post_routes[/agregar_a_lista] /agregar_a_lista : 415
+PASSED
+tests/test_app.py::test_post_routes[/cerrar_caja] /cerrar_caja : 302
+PASSED
+tests/test_app.py::test_post_routes[/agregar_compatibilidad/1] /agregar_compatibilidad/1 : 302
+PASSED
+tests/test_app.py::test_post_routes[/registrar_pago] /registrar_pago : 400
+PASSED
+tests/test_app.py::test_post_routes[/agregar_refaccion/1] /agregar_refaccion/1 : 404
+PASSED
+tests/test_app.py::test_post_routes[/avanzar_estado/1] /avanzar_estado/1 : 404
+PASSED
+tests/test_app.py::test_post_routes[/entregar/1] /entregar/1 : 404
+PASSED
+
+============================== warnings summary ===============================
+tests/test_app.py::test_get_routes[/motos/1]
+tests/test_app.py::test_get_routes[/presupuesto/1]
+tests/test_app.py::test_post_routes[/agregar_refaccion/1]
+tests/test_app.py::test_post_routes[/avanzar_estado/1]
+tests/test_app.py::test_post_routes[/entregar/1]
+  C:\Users\danie\OneDrive\Documents\App moto pingu\venv\Lib\site-packages\flask_sqlalchemy\query.py:30: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x series of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+    rv = self.get(ident)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================== 25 passed, 2 skipped, 5 warnings in 1.18s ==================

@@ -1,6 +1,6 @@
 from flask import Blueprint, Flask, render_template, request, redirect, url_for, session, jsonify, flash
 from datetime import datetime
-from models import db, Inventario, Compatibilidad, Venta, Cliente, Servicio, Pago, Moto, Caja, Presupuesto, RefaccionCliente
+from models import db, Anticipo, Inventario, Compatibilidad, Venta, Cliente, Servicio, Pago, Moto, Caja, Presupuesto, RefaccionCliente
 import pandas as pd
 from sqlalchemy import text
 import os
@@ -150,7 +150,6 @@ def init_app(app):
         flash("Servicio agregado al carrito", "success")
         return redirect("/carrito")
 
-
     @app.route("/agregar_servicios_carrito", methods=["POST"])
     def agregar_servicios_carrito():
         """
@@ -181,7 +180,6 @@ def init_app(app):
 
         flash("Servicios agregados al carrito", "success")
         return redirect("/carrito")
-
 
     @app.route("/cancelar_carrito", methods=["POST"])
     def cancelar_carrito():
@@ -366,14 +364,15 @@ def init_app(app):
                 flash("La hora de entrega debe estar entre 11:00 y 17:00", "error")
                 return redirect(url_for("clientes"))
 
+        # ⚠️ CAMBIO: se elimina anticipo único y se fuerza tipo Servicio
         nuevo_cliente = Cliente(
             nombre              = nombre,
             celular             = celular,
-            anticipo            = float(anticipo) if anticipo else 0.0,
             fecha_ingreso       = datetime.now(),   # 🔹 Hora automática
             fecha_entrega       = fecha_entrega,
             descripcion_problema= descripcion_problema,
-            problemas_ocultos   = problemas_ocultos
+            problemas_ocultos   = problemas_ocultos,
+            tipo                = "Servicio"        # 🔹 Nunca guardar Libre
         )
         db.session.add(nuevo_cliente)
         db.session.commit()
@@ -386,6 +385,15 @@ def init_app(app):
         )
         db.session.add(nueva_moto)
         db.session.commit()
+
+        # ⚠️ CAMBIO: registrar anticipo inicial en historial
+        if anticipo and float(anticipo) > 0:
+            nuevo_anticipo = Anticipo(
+                cliente_id = nuevo_cliente.id,
+                monto      = float(anticipo)
+            )
+            db.session.add(nuevo_anticipo)
+            db.session.commit()
 
         flash("Cliente registrado correctamente", "success")
         return redirect(url_for("clientes"))
@@ -417,6 +425,52 @@ def init_app(app):
         db.session.delete(cliente)
         db.session.commit()
         flash("Cliente eliminado", "success")
+        return redirect(url_for("clientes"))
+
+
+    @app.route("/editar_celular/<int:id>", methods=["POST"])
+    def editar_celular(id):
+        """
+        Edita el número de celular de un cliente.
+        - Recibe el ID del cliente y el nuevo número.
+        - Actualiza el campo en la base de datos.
+        - Confirma la operación con un mensaje flash.
+        """
+        cliente = Cliente.query.get_or_404(id)
+        nuevo_celular = request.form.get("celular")
+
+        if nuevo_celular and nuevo_celular.strip():
+            cliente.celular = nuevo_celular.strip()
+            db.session.commit()
+            flash("Celular actualizado correctamente", "success")
+        else:
+            flash("El número de celular no puede estar vacío", "error")
+
+        return redirect(url_for("clientes"))
+
+
+    @app.route("/agregar_anticipo/<int:id>", methods=["POST"])
+    def agregar_anticipo(id):
+        """
+        Añade un nuevo anticipo al historial de un cliente.
+        - Recibe el ID del cliente y el monto.
+        - Inserta un registro en la tabla Anticipo.
+        - Confirma la operación con un mensaje flash.
+        """
+        cliente = Cliente.query.get_or_404(id)
+        monto = request.form.get("monto")
+
+        if monto and float(monto) > 0:
+            nuevo_anticipo = Anticipo(
+                cliente_id = cliente.id,
+                monto      = float(monto)
+            )
+            db.session.add(nuevo_anticipo)
+            db.session.commit()
+            flash("Anticipo añadido correctamente", "success")
+        else:
+            flash("El monto del anticipo debe ser mayor a 0", "error")
+
         return redirect(url_for("clientes"))
 
 # ==========================
@@ -497,9 +551,9 @@ def init_app(app):
         nombre      = request.form.get("nombre", "").strip().title()
         cantidad    = request.form.get("cantidad", type=int, default=0)
         precio      = request.form.get("precio", type=float, default=0.0)
-        costo       = request.form.get("costo", type=float, default=0.0)
+        costo       = request.form.get("costo_unitario", type=float, default=0.0)
 
-        if not nombre or cantidad < 0 or precio <= 0:
+        if not nombre or cantidad < 0 or precio <= 0 or costo <= 0:
             flash("Error: todos los campos son obligatorios y válidos", "error")
             return redirect(url_for("inventario"))
 
@@ -521,6 +575,7 @@ def init_app(app):
         db.session.commit()
         flash("Pieza agregada correctamente", "success")
         return redirect(url_for("inventario"))
+
 
     @app.route("/editar_inventario/<int:id>", methods=["POST"])
     def editar_inventario(id):
@@ -773,7 +828,8 @@ def init_app(app):
         # Registrar cada partida del presupuesto como venta y descontar inventario
         for p in moto.presupuestos:
             # Descontar inventario si existe
-            inv = Inventario.query.filter_by(nombre=p.producto).first()
+            inv = Inventario.query.filter(db.func.lower(db.func.trim(Inventario.nombre)) == p.producto.lower().strip()).first()
+            serv = Servicio.query.filter(db.func.lower(db.func.trim(Servicio.nombre)) == p.producto.lower().strip()).first()
             if inv:
                 if inv.cantidad >= p.cantidad:
                     inv.cantidad -= p.cantidad   # ✅ descuenta inventario
@@ -781,17 +837,25 @@ def init_app(app):
                 else:
                     flash(f"Stock insuficiente para {p.producto}, se registró igualmente.", "warning")
 
-            # ✅ Corrección: usar p.tipo y fallback cantidad=1
+            # ✅ Determinar tipo según existencia real
+            if inv:
+                tipo_final = "Refaccion"
+            elif serv:
+                tipo_final = "Servicio"
+            else:
+                flash(f"{p.producto} no existe en Inventario ni en Servicios. Revisa el presupuesto.", "error")
+                continue  # no registrar venta
+
             nueva_venta = Venta(
-                producto_id = None if p.tipo == "Servicio" else inv.id if inv else None,
-                tipo             = p.tipo,
+                producto_id = inv.id if tipo_final == "Refaccion" and inv else None,
+                tipo             = tipo_final,
                 cantidad_vendida = p.cantidad if p.cantidad else 1,
                 descripcion      = p.producto,
                 monto            = p.total,
                 fecha            = datetime.now()
             )
-            db.session.add(nueva_venta)
 
+            db.session.add(nueva_venta)
         # Guardar cambios
         db.session.commit()
 
@@ -880,7 +944,7 @@ def init_app(app):
         return render_template("pagos.html", lista=lista)
 
 
-    app.route("/registrar_pago", methods=["POST"])
+    @app.route("/registrar_pago", methods=["POST"])
     def registrar_pago():
         """
         Registra un nuevo pago en el sistema.
@@ -974,8 +1038,8 @@ def init_app(app):
 
         # ✅ Identificación automática
         tipo = None
-        inv = Inventario.query.filter_by(nombre=producto).first()
-        serv = Servicio.query.filter_by(nombre=producto).first()
+        inv = Inventario.query.filter(Inventario.nombre.ilike(producto)).first()
+        serv = Servicio.query.filter(Servicio.nombre.ilike(producto)).first()
 
         if inv:
             tipo = "Refacción"
@@ -987,7 +1051,10 @@ def init_app(app):
         elif serv:
             tipo = "Servicio"
         else:
-            tipo = "Libre"  # entrada manual
+            # 🚫 Bloquear inserción si no existe en Inventario ni en Servicios
+            flash(f"{producto} no existe en Inventario ni en Servicios. Agrega manualmente en su apartado antes de presupuestar.", "error")
+            return redirect(url_for("motos", cliente_id=moto.cliente_id))
+
 
         # ✅ Crear registro de presupuesto
         nuevo = Presupuesto(
@@ -1015,10 +1082,11 @@ def init_app(app):
         """
         presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
         moto_id = presupuesto.moto_id
+        cliente_id = Moto.query.get_or_404(moto_id).cliente_id
         db.session.delete(presupuesto)
         db.session.commit()
-        return redirect(url_for("presupuesto", moto_id=moto_id))
-
+        # ✅ Redirige a la vista que realmente usas
+        return redirect(url_for("motos", cliente_id=cliente_id))
 
     @app.route("/presupuesto/<int:moto_id>")
     def presupuesto(moto_id):
@@ -1030,11 +1098,13 @@ def init_app(app):
         """
         moto = Moto.query.get_or_404(moto_id)
         total = sum(p.total for p in moto.presupuestos)
-        return render_template("presupuesto.html", moto=moto, total=total)
+        cliente = Cliente.query.get_or_404(moto.cliente_id)
+        return render_template("presupuesto.html", moto=moto, cliente=cliente, total=total)
 
 # ==========================
 #   GRUPO: REPORTES
 # ==========================
+    @app.route("/reportes")
     def reportes(df_ventas, df_totales, correo_destino=None):
         mes_actual = datetime.now().strftime("%B").capitalize()
         nombre_archivo = f"reportes/Reportes_{mes_actual}.xlsx"
@@ -1043,18 +1113,38 @@ def init_app(app):
         # ✅ Calcular total en Ventas con cantidad + precio
         df_ventas["total"] = df_ventas["cantidad"] * df_ventas["precio"]
 
-# ==========================
-# FORMATO PERSONALIZADO
-# ==========================
+        # ✅ Crear DataFrames de Inventario y Servicios (catálogos)
+        df_inventario = pd.DataFrame([{
+            "id": i.id,
+            "nombre": i.nombre,
+            "categoria": i.categoria,
+            "cantidad": i.cantidad,
+            "reservado": i.reservado,
+            "precio_unitario": i.precio_unitario
+        } for i in Inventario.query.order_by(Inventario.nombre.asc()).all()])
+
+        df_servicios_catalogo = pd.DataFrame([{
+            "id": s.id,
+            "nombre": s.nombre,
+            "Categoría": s.tipo,
+            "importe": s.importe
+        } for s in Servicio.query.order_by(Servicio.nombre.asc()).all()])
+
+        # ==========================
+        # FORMATO PERSONALIZADO
+        # ==========================
         with pd.ExcelWriter(nombre_archivo, engine="xlsxwriter") as writer:
-            # 🔹 Separar productos y servicios
-            df_productos = df_ventas[df_ventas["tipo"] == "refaccion"].copy()
-            df_servicios = df_ventas[df_ventas["tipo"] == "servicio"].copy()
+            # 🔹 Separar productos y servicios vendidos
+            df_productos = df_ventas[df_ventas["tipo"].str.lower().str.strip() == "refaccion"].copy()
+            df_servicios = df_ventas[df_ventas["tipo"].str.lower().str.strip() == "servicio"].copy()
 
-            # 🔹 Renombrar hoja Ventas → Productos
+            # 🔹 Crear hojas
             df_productos.to_excel(writer, sheet_name="Productos", index=False)
-            df_servicios.to_excel(writer, sheet_name="Nomina", index=False)
+            df_servicios.to_excel(writer, sheet_name="Servicios", index=False)
+            df_inventario.to_excel(writer, sheet_name="Inventario", index=False)
+            df_servicios_catalogo.to_excel(writer, sheet_name="Catálogo Servicios", index=False)
 
+            # 🔹 Formato visual
             workbook = writer.book
             formato_encabezado = workbook.add_format({
                 'bold': True, 'bg_color': '#D9D9D9', 'font_color': 'black',
@@ -1065,25 +1155,16 @@ def init_app(app):
             formato_numero = workbook.add_format({'num_format': '#,##0.00'})
             formato_fecha = workbook.add_format({'num_format': 'yyyy-mm-dd'})
 
-            # 🔹 Ajuste automático y formato de encabezados
-            for hoja, df in [("Productos", df_productos), ("Nomina", df_servicios)]:
+            for hoja, df in [("Productos", df_productos), ("Servicios", df_servicios)]:
                 ws = writer.sheets[hoja]
                 for col_num, value in enumerate(df.columns):
                     ws.write(0, col_num, str(value).upper(), formato_encabezado)
                     ws.set_column(col_num, col_num, 18)
 
-                # 🔹 Alternar colores de filas
                 for row_num in range(1, len(df) + 1):
                     formato = formato_fila_par if row_num % 2 == 0 else formato_fila_impar
                     ws.set_row(row_num, None, formato)
 
-                # 🔹 Fecha solo una vez por día
-                fechas = df["fecha"].astype(str).tolist()
-                for i in range(1, len(fechas)):
-                    if fechas[i] == fechas[i - 1]:
-                        ws.write(i + 1, df.columns.get_loc("fecha"), "", formato_fecha)
-
-                # 🔹 Total dinámico al final
                 ultima_fila = len(df) + 2
                 col_precio = df.columns.get_loc("precio")
                 col_total = df.columns.get_loc("total")
@@ -1091,17 +1172,22 @@ def init_app(app):
                 ws.write_formula(ultima_fila, col_total, f"=SUM(F2:F{ultima_fila-1})", formato_numero)
                 ws.write(ultima_fila, df.columns.get_loc("producto"), "TOTAL GENERAL", formato_encabezado)
 
-            # 🔹 Eliminar hoja Totales si existe
-            if "Totales" in writer.sheets:
-                del writer.sheets["Totales"]
+                # ✅ Agregar nómina solo en hoja Servicios
+                if hoja == "Servicios":
+                    ultima_fila += 2
+                    ws.write(ultima_fila, df.columns.get_loc("producto"), "NÓMINA (20%)", formato_encabezado)
+                    ws.write_formula(ultima_fila, col_total, f"=F{ultima_fila-1}*0.20", formato_numero)
 
-    # Enviar por correo si aplica
-        if correo_destino:
+        # ✅ Enviar por correo solo si se proporcionó
+        if correo_destino and correo_destino.strip():
             enviar_reporte_por_correo(nombre_archivo, correo_destino)
 
-# ==========================
-#   FUNCIÓN AUXILIAR: envío por correo
-# ==========================
+        flash(f"Reporte generado correctamente: {nombre_archivo}", "success")
+        return redirect(url_for("ventas"))
+
+    # ==========================
+    #   FUNCIÓN AUXILIAR: envío por correo
+    # ==========================
     def enviar_reporte_por_correo(nombre_archivo, destinatario):
         remitente = "tu_correo@gmail.com"
         password = "tu_password_app"  # Usa contraseña de aplicación
@@ -1125,6 +1211,7 @@ def init_app(app):
         server.quit()
 
         print(f"✅ Reporte enviado por correo a {destinatario}")
+
 
 # ==========================
 #   GRUPO: SERVICIOS
@@ -1197,7 +1284,8 @@ def init_app(app):
             flash("Contraseña incorrecta", "error")
             return redirect(url_for("ventas"))  # ✅ CAMBIO
 
-        ventas = Venta.query.all()
+        ventas = Venta.query.order_by(Venta.fecha.asc()).all()
+
         df_ventas = pd.DataFrame([{
             "id": v.id,
             "fecha": v.fecha.strftime("%Y-%m-%d"),
@@ -1211,7 +1299,8 @@ def init_app(app):
         correo_destino = request.form.get("correo_destino")  # ✅ CAMBIO
 
         total_refacciones = db.session.query(db.func.sum(Venta.monto))\
-            .filter(db.func.lower(db.func.trim(Venta.tipo)) == "refaccion").scalar() or 0
+            .filter(db.func.lower(db.func.replace(db.func.trim(Venta.tipo), "ó", "o")) == "refaccion").scalar() or 0
+
         total_servicios = db.session.query(db.func.sum(Venta.monto))\
             .filter(db.func.lower(db.func.trim(Venta.tipo)) == "servicio").scalar() or 0
 
@@ -1249,7 +1338,7 @@ def init_app(app):
     def ventas():
         # ✅ Corrección aplicada: usar "refaccion" en lugar de "producto"
         total_refacciones = db.session.query(db.func.sum(Venta.monto))\
-            .filter(db.func.lower(db.func.trim(Venta.tipo)) == "refaccion").scalar() or 0  # 🔹 CAMBIO
+            .filter(db.func.lower(db.func.replace(db.func.trim(Venta.tipo), "ó", "o")) == "refaccion").scalar() or 0
 
         total_servicios = db.session.query(db.func.sum(Venta.monto))\
             .filter(db.func.lower(db.func.trim(Venta.tipo)) == "servicio").scalar() or 0
@@ -1258,7 +1347,8 @@ def init_app(app):
 
         # ⚠️ CAMBIO: nómina como cálculo
         nomina = total_servicios * 0.20
-        ventas = Venta.query.all()
+        ventas = Venta.query.order_by(Venta.fecha.asc()).all()
+
 
         df_ventas = pd.DataFrame([{
             "id": v.id,
@@ -1288,9 +1378,14 @@ def init_app(app):
 
     @app.route("/ventas_resumen")
     def mostrar_ventas():
-        ventas = Venta.query.all()
-        total_refacciones = db.session.query(db.func.sum(Venta.monto)).filter_by(tipo="refaccion").scalar() or 0
-        total_servicios   = db.session.query(db.func.sum(Venta.monto)).filter_by(tipo="servicio").scalar() or 0
+        ventas = Venta.query.order_by(Venta.fecha.asc()).all()
+
+        total_refacciones = db.session.query(db.func.sum(Venta.monto))\
+            .filter(db.func.lower(db.func.replace(db.func.trim(Venta.tipo), "ó", "o")) == "refaccion").scalar() or 0
+
+        total_servicios = db.session.query(db.func.sum(Venta.monto))\
+            .filter(db.func.lower(db.func.trim(Venta.tipo)) == "servicio").scalar() or 0
+
         total_general     = total_refacciones + total_servicios
 
         # ⚠️ CAMBIO: nómina como cálculo
