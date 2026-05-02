@@ -12,9 +12,14 @@ echo =========================================
 call venv\Scripts\activate
 
 echo =========================================
+echo Actualizando pip y pyinstaller si hay nuevas versiones...
+echo =========================================
+python -m pip install --upgrade pip
+pip install --upgrade pyinstaller
+
+echo =========================================
 echo Instalando dependencias necesarias...
 echo =========================================
-pip install --upgrade pip
 pip install pandas openpyxl requests
 
 echo =========================================
@@ -62,7 +67,7 @@ git add .
 git commit -m "Aplicar .gitignore optimizado automaticamente" >nul 2>&1
 
 echo =========================================
-echo Actualizando version.json...
+echo Actualizando version.json y version.txt...
 echo =========================================
 setlocal enabledelayedexpansion
 
@@ -100,12 +105,14 @@ if "!choice!"=="3" (
 
 set version=!major!.!minor!.!patch!
 
+REM Actualizar ambos archivos
 echo { "version": "!version!", "url": "https://github.com/danielop9305/taller/releases/download/!version!/app.exe" } > version.json
+echo !version! > version.txt
 
 echo =========================================
-echo Subiendo version.json al repositorio Git...
+echo Subiendo version.json y version.txt al repositorio Git...
 echo =========================================
-git add version.json
+git add version.json version.txt
 git commit -m "Actualizacion automatica de version !version!"
 git push origin main
 
