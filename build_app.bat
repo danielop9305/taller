@@ -107,7 +107,7 @@ set version=!major!.!minor!.!patch!
 
 REM Actualizar ambos archivos
 echo { "version": "!version!", "url": "https://github.com/danielop9305/taller/releases/download/!version!/app.exe" } > version.json
-echo !version! > version.txt
+echo !version!>version.txt
 
 echo =========================================
 echo Subiendo version.json y version.txt al repositorio Git...
