@@ -7,13 +7,26 @@ import os
 import sys
 import webbrowser
 
-LOCAL_VERSION = "1.0.0"
+# Leer la versión local desde version.txt en lugar de hardcodear
+try:
+    with open("version.txt") as f:
+        LOCAL_VERSION = f.read().strip()
+except FileNotFoundError:
+    LOCAL_VERSION = "0.0.0"
+
 VERSION_URL = "https://raw.githubusercontent.com/danielop9305/taller/main/version.json"
 
 app = Flask(__name__, template_folder="templates")
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-db_path = os.path.join(BASE_DIR, "instance", "taller.db")
-app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{db_path}"
+
+if getattr(sys, 'frozen', False):
+    # Ejecutable compilado (.exe)
+    DB_PATH = r"C:\MotoPinguino\instance\taller.db"
+else:
+    # Entorno de desarrollo
+    BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+    DB_PATH = os.path.join(BASE_DIR, "instance", "taller.db")
+    
+app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{DB_PATH}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.secret_key = "clave_secreta_segura"
 
@@ -25,7 +38,7 @@ def check_for_update():
         response = requests.get(VERSION_URL)
         if response.status_code == 200:
             data = response.json()
-            remote_version = data["version"]
+            remote_version = data["version"].strip()
             download_url = data["url"]
 
             if remote_version != LOCAL_VERSION:
@@ -42,7 +55,7 @@ def download_update(url):
     try:
         print("Descargando nueva versión...")
         response = requests.get(url, stream=True)
-        exe_name = "app_update.exe"
+        exe_name = "app.exe"  # usar el mismo nombre que subes al release
 
         with open(exe_name, "wb") as f:
             for chunk in response.iter_content(chunk_size=8192):
@@ -60,8 +73,5 @@ routes.init_app(app)
 
 if __name__ == "__main__":
     check_for_update()
-    import webbrowser
     webbrowser.open("http://127.0.0.1:5000")
     app.run(debug=False, use_reloader=False)
-
-
