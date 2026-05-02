@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="flashes">
+          {% for category, message in messages %}
+            <li class="{{ category }}">{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+    <h2>Caja actual</h2>
+
+    <p>Total de ventas acumuladas: ${{ "%.2f"|format(total_ventas) }}</p>
+
+    <form method="POST" action="/cerrar_caja">
+        <label>Contraseña:</label>
+        <input type="password" name="admin_pass">
+        <button type="submit">Cerrar Caja</button>
+    </form>
+
+    {% if faltante %}
+        <p style="color:red; font-weight:bold;">FALTANTE EN CAJA</p>
+    {% endif %}
+{% endblock %}

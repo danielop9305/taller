@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Dashboard Taller Moto Pingüino</h2>
+<p>Total de ventas: ${{ ventas }}</p>
+<p>Total de pagos: ${{ pagos }}</p>
+<h3>Stock crítico</h3>
+<ul>
+    {% for s in stock %}
+        <li>{{ s.nombre }} - Cantidad: {{ s.cantidad }}</li>
+    {% endfor %}
+</ul>
+{% endblock %}
+ 

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Agregar Refacción</h2>
+<form method="POST">
+    Categoría: <input type="text" name="categoria" placeholder="Ej: Aceites, Balatas" required><br>
+    Nombre: <input type="text" name="nombre" required><br>
+    Cantidad: <input type="number" name="cantidad" required><br>
+    Precio unitario: <input type="number" step="0.01" name="precio" required><br>
+    <input type="submit" value="Guardar">
+</form>
+{% endblock %}

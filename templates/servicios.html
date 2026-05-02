@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block content %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="flashes">
+          {% for category, message in messages %}
+            <li class="{{ category }}">{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    <h2>Servicios</h2>
+
+    {% if not session.get("admin_autorizado") %}
+    <!-- 🔹 Login admin -->
+    <form method="POST" action="/validar_admin" style="margin-bottom:20px;" novalidate>
+        <input type="hidden" name="origen" value="servicios">
+        <label>Contraseña admin:</label>
+        <input type="password" name="admin_pass" required>
+        <button type="submit">Ingresar</button>
+    </form>
+    {% else %}
+    <!-- 🔹 Logout admin -->
+    <form method="POST" action="/cerrar_admin" style="margin-bottom:20px;" novalidate>
+        <input type="hidden" name="origen" value="servicios">
+        <button type="submit">Cerrar sesión</button>
+    </form>
+    {% endif %}
+
+    {% for tipo, lista in servicios_por_tipo.items() %}
+        <button type="button" onclick="toggle('{{ tipo }}')">{{ tipo }}</button>
+        <div id="{{ tipo }}" style="display:none; margin-left:20px;">
+            <table class="tabla-servicios">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Tipo</th>
+                        <th>Nombre</th>
+                        <th>Importe</th>
+                        {% if session.get("admin_autorizado") %}
+                        <th>Acciones</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in lista %}
+                    <tr>
+                        <td>{{ s.id }}</td>
+                        <td>
+                            {% if session.get("admin_autorizado") %}
+                                <form method="POST" action="{{ url_for('editar_servicio', id=s.id) }}" novalidate>
+                                    <input type="text" name="tipo" value="{{ s.tipo }}">
+                                    <button type="submit">Guardar</button>
+                                </form>
+                            {% else %}
+                                {{ s.tipo }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if session.get("admin_autorizado") %}
+                                <form method="POST" action="{{ url_for('editar_servicio', id=s.id) }}" novalidate>
+                                    <input type="text" name="nombre" value="{{ s.nombre }}">
+                                    <button type="submit">Guardar</button>
+                                </form>
+                            {% else %}
+                                {{ s.nombre }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if session.get("admin_autorizado") %}
+                                <form method="POST" action="{{ url_for('editar_servicio', id=s.id) }}" novalidate>
+                                    <input type="number" step="0.01" name="importe" value="{{ s.importe }}">
+                                    <button type="submit">Guardar</button>
+                                </form>
+                            {% else %}
+                                ${{ "%.2f"|format(s.importe) }}
+                            {% endif %}
+                        </td>
+                        {% if session.get("admin_autorizado") %}
+                        <td>
+                            <form method="POST" action="{{ url_for('eliminar_servicio', id=s.id) }}" style="display:inline;" novalidate>
+                                <button type="submit">Eliminar</button>
+                            </form>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endfor %}
+
+    <h3>Agregar nuevo servicio</h3>
+    <form method="POST" action="/agregar_servicio" novalidate>
+        <label>Tipo:</label>
+        <input type="text" name="tipo" value="{{ session.get('tipo_actual','') }}" required>
+        <label>Nombre:</label>
+        <input type="text" name="nombre" required>
+        <label>Importe:</label>
+        <input type="number" step="0.01" name="importe" required>
+        <button type="submit">Agregar</button>
+    </form>
+
+    <script>
+        function toggle(id) {
+            const div = document.getElementById(id);
+            div.style.display = div.style.display === "none" ? "block" : "none";
+        }
+    </script>
+
+    <style>
+        .tabla-servicios {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        .tabla-servicios th {
+            font-weight: bold;
+            text-transform: uppercase;
+            background-color: #d9d9d9;
+            padding: 8px;
+            text-align: center;
+        }
+        .tabla-servicios td {
+            padding: 8px;
+            text-align: left;
+        }
+        .tabla-servicios tbody tr:nth-child(odd) {
+            background-color: #ffffff;
+        }
+        .tabla-servicios tbody tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .tabla-servicios, .tabla-servicios th, .tabla-servicios td {
+            border: 1px solid #000;
+        }
+        button[type="button"] {
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        .tabla-servicios {
+            margin-bottom: 25px;
+        }
+    </style>
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+    <h2>Registrar nuevo cliente y motocicleta</h2>
+    <form method="POST" action="/agregar_cliente">
+        <label>Nombre:</label>
+        <input type="text" name="nombre" required>
+        <label>Celular:</label>
+        <input type="text" name="celular" required>
+
+        <h3>Motocicleta</h3>
+        <label>Marca:</label>
+        <input type="text" name="marca" required>
+        <label>Modelo:</label>
+        <input type="text" name="modelo" required>
+
+        <button type="submit">Registrar</button>
+    </form>
+{% endblock %}

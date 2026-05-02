@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block content %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="flashes">
+          {% for category, message in messages %}
+            <li class="{{ category }}">{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+<h2>Registrar nueva venta</h2>
+<form method="POST" action="/agregar_carrito" novalidate>
+    <div style="display:flex; gap:40px; margin-bottom:15px;">
+        <!-- Columna Producto -->
+        <div style="flex:1;">
+            <label>Producto:</label>
+            <input type="text" id="producto" name="producto" autocomplete="off" style="width:100%;">
+            <div id="coincidencias_producto"></div>
+        </div>
+
+        <!-- Columna Servicio -->
+        <div style="flex:1;">
+            <label>Servicio:</label>
+            <input type="text" id="servicio" name="servicio" autocomplete="off" style="width:100%;">
+            <div id="coincidencias_servicio"></div>
+        </div>
+    </div>
+
+    <!-- Cantidad -->
+    <label>Cantidad:</label>
+    <input type="number" name="cantidad" min="1" value="1" required>
+
+    <button type="submit">Agregar al carrito</button>
+</form>
+
+<h3>Carrito actual</h3>
+{% if carrito %}
+<table border="1" cellspacing="0" cellpadding="5" style="margin-top:20px;">
+    <thead>
+        <tr>
+            <th>Nombre</th>
+            <th>Cantidad</th>
+            <th>Precio Unitario</th>
+            <th>Total</th>
+            <th>Acción</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in carrito %}
+        <tr>
+            <td>{{ item["nombre"] }}</td>
+            <td>{{ item["cantidad"] }}</td>
+            <td>${{ "%.2f"|format(item["precio_unitario"]) }}</td>
+            <td>${{ "%.2f"|format(item["total"]) }}</td>
+            <td>
+                <form method="POST" action="/eliminar_del_carrito/{{ item['id'] }}" novalidate>
+                    <button type="submit">Eliminar</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<p>Total Carrito: ${{ "%.2f"|format(total_carrito) }}</p>
+
+<form method="POST" action="/confirmar_venta" style="margin-top:20px;" novalidate>
+    <label>Recibido:</label>
+    <input type="number" id="recibido" name="recibido" step="0.01" required>
+    <p id="cambio"></p>
+    <button type="submit">Confirmar venta</button>
+</form>
+
+<form method="POST" action="/cancelar_carrito" style="margin-top:10px;" novalidate>
+    <button type="submit">Cancelar carrito</button>
+</form>
+{% else %}
+<p>El carrito está vacío.</p>
+{% endif %}
+
+<script>
+    // Producto: busca solo en inventario
+    document.getElementById("producto").addEventListener("input", function() {
+        const query = this.value;
+        if (!query) {
+            document.getElementById("coincidencias_producto").innerHTML = "";
+            return;
+        }
+        fetch(`/sugerir_producto_inventario?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                let html = "<ul>";
+                data.forEach(item => {
+                    let color = item.estado;
+                    let leyenda = item.leyenda ? " - " + item.leyenda : "";
+                    let disabled = item.seleccionable ? "" : "style='pointer-events:none;opacity:0.5;'";
+
+                    html += `<li ${disabled} style="color:${color};font-weight:bold;" 
+                                onclick="seleccionar('producto','${item.nombre}',${item.id})">
+                                ${item.categoria} - ${item.nombre}${leyenda}
+                             </li>`;
+                });
+                html += "</ul>";
+                document.getElementById("coincidencias_producto").innerHTML = html;
+            });
+    });
+
+    // Servicio: busca solo en servicios (corregido)
+    document.getElementById("servicio").addEventListener("input", function() {
+        const query = this.value;
+        if (!query) {
+            document.getElementById("coincidencias_servicio").innerHTML = "";
+            return;
+        }
+        fetch(`/sugerir_servicio?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                let html = "<ul>";
+                data.forEach(item => {
+                    html += `<li onclick="seleccionar('servicio','${item.nombre}',${item.id})">
+                                ${item.tipo} - ${item.nombre}
+                             </li>`;
+                });
+                html += "</ul>";
+                document.getElementById("coincidencias_servicio").innerHTML = html;
+            });
+    });
+
+    // Función común
+    function seleccionar(tipo, nombre, id) {
+        document.getElementById(tipo).value = nombre;
+        document.getElementById("coincidencias_" + tipo).innerHTML = "";
+        let hidden = document.getElementById(tipo + "_id");
+        if (!hidden) {
+            hidden = document.createElement("input");
+            hidden.type = "hidden";
+            hidden.id = tipo + "_id";
+            hidden.name = tipo + "_id";
+            document.forms[0].appendChild(hidden);
+        }
+        hidden.value = id;
+    }
+</script>
+
+{% endblock %}

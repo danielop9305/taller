@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+    <h2>Registrar nuevo cliente</h2>
+    <form method="POST" action="/agregar_cliente">
+        <label>Nombre:</label>
+        <input type="text" name="nombre" required>
+        <label>Celular:</label>
+        <input type="text" name="celular" required>
+        <button type="submit">Registrar</button>
+    </form>
+{% endblock %}
